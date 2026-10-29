@@ -39,6 +39,9 @@ class StoreGroup(SyncedBase, Base):
     __tablename__ = "store_group"
 
     name: Mapped[str] = mapped_column(Text)
+    # The household's everyday group: where stop-gap items go when the item has no
+    # non-bulk "also OK" store (D-029).
+    is_default: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
 
 
 class StoreGroupMember(SyncedBase, Base):
