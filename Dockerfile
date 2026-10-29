@@ -25,6 +25,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-editable
+# ingredient-parser-nlp needs an NLTK tagger; fetch it at build time, not at worker start.
+RUN python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', download_dir='/usr/local/share/nltk_data', quiet=True)"
 USER thymble
 EXPOSE 8000
 CMD ["uvicorn", "thymble.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
@@ -37,6 +39,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
+# ingredient-parser-nlp needs an NLTK tagger; fetch it at build time, not at worker start.
+RUN python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', download_dir='/usr/local/share/nltk_data', quiet=True)"
 USER thymble
 EXPOSE 8000
 CMD ["uvicorn", "thymble.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "src"]
