@@ -54,11 +54,13 @@ def singular(key: str) -> str:
     if not words:
         return key
     last = words[-1]
-    if last.endswith("ies") and len(last) > 4:
+    if last.endswith("sses"):
+        pass  # "molasses", "glasses"
+    elif last.endswith("ies") and len(last) > 4:
         last = last[:-3] + "y"
     elif last.endswith("oes") or last.endswith("ches") or last.endswith("shes"):
         last = last[:-2]
-    elif last.endswith("s") and not last.endswith(("ss", "us", "is")) and len(last) > 3:
+    elif last.endswith("s") and not last.endswith(("ss", "us", "is", "sses")) and len(last) > 3:
         last = last[:-1]
     return " ".join([*words[:-1], last])
 
@@ -122,7 +124,10 @@ def apply_dictionary(line: ParsedLine) -> None:
         if m and lookup_compound(line.name) is None:
             prep = m.group(1)
             line.name = line.name[len(prep) :].strip()
-            line.preparation = f"{prep}, {line.preparation}" if line.preparation else prep
+            if not line.preparation:
+                line.preparation = prep
+            elif prep not in line.preparation.lower():
+                line.preparation = f"{prep}, {line.preparation}"
             compound = lookup_compound(line.name)
     line.ingredient_name = compound.canonical if compound else name_key(line.name)
 

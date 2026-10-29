@@ -15,11 +15,11 @@ import pytest
 from pydantic import BaseModel, ConfigDict
 
 from tests.conftest import make_settings
+from tests.llm_fakes import FakeProvider
 from thymble.llm import ImageInput, LLMClient, MemoryStore, Task, strict_schema
 from thymble.llm.providers import (
     AnthropicProvider,
     LLMRequest,
-    LLMResponse,
     OpenAICompatibleProvider,
     ProviderError,
     ProviderTimeout,
@@ -31,22 +31,6 @@ class Item(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
     quantity: float | None = None
-
-
-class FakeProvider:
-    def __init__(self, name: str, replies: list[object]) -> None:
-        self.name = name
-        self.replies = list(replies)
-        self.requests: list[LLMRequest] = []
-
-    async def complete(self, request: LLMRequest, timeout: float) -> LLMResponse:
-        self.requests.append(
-            LLMRequest(**{**request.__dict__, "images": list(request.images)})  # snapshot
-        )
-        reply = self.replies.pop(0)
-        if isinstance(reply, Exception):
-            raise reply
-        return LLMResponse(text=reply, model=f"{self.name}-model", input_tokens=10, output_tokens=5)
 
 
 def run(coro):

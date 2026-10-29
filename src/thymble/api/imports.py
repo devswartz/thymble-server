@@ -16,6 +16,7 @@ from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 from sqlalchemy.orm import Session
 
@@ -158,7 +159,7 @@ async def create_import(
         form = await request.form()
         photo = form.get("photo")
         if photo is None or isinstance(photo, str):
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "photo file required")
+            raise HTTPException(422, "photo file required")
         mime = (photo.content_type or "").split(";")[0].strip().lower()
         if mime not in PHOTO_TYPES:
             raise HTTPException(
@@ -172,8 +173,8 @@ async def create_import(
         try:
             body = ImportRequest.model_validate_json(await request.body())
         except ValidationError as exc:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_ENTITY, exc.errors(include_url=False)
+            raise RequestValidationError(
+                exc.errors(include_url=False, include_context=False)
             ) from exc
         if body.html is not None:
             if len(body.html.encode("utf-8")) > settings.import_max_html_bytes:
