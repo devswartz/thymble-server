@@ -10,6 +10,8 @@ x-app: &app
   env_file: .env
   environment:
     POSTGRES_HOST: postgres
+    # Inside the network Postgres is always on 5432; POSTGRES_PORT in .env is the host port.
+    POSTGRES_PORT: "5432"
     REDIS_URL: redis://redis:6379/0
   restart: unless-stopped
 

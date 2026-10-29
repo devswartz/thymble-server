@@ -34,6 +34,7 @@ docker compose up -d --build
 curl http://localhost:8000/healthz
 curl http://localhost:8000/v1/capabilities
 curl http://localhost:8080/probes/liveness      # PowerSync
+# Magic-link email lands in Mailpit: http://localhost:8025
 
 # 4. Run the tests and linters inside the api container
 docker compose exec api sh -c 'DATABASE_URL="postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/$POSTGRES_DB" pytest'
@@ -46,7 +47,7 @@ docker compose down -v
 
 `docker compose up` automatically layers `docker-compose.override.yml` on top of `docker-compose.yml`. The override builds the `dev` image target, bind-mounts the source tree, and runs the api (uvicorn) and worker (arq) with auto-reload, so code changes apply without rebuilding. It also publishes Postgres on `127.0.0.1:15432` and Redis on `127.0.0.1:16379`. For a production-shaped run, use only the base file: `docker compose -f docker-compose.yml up -d`.
 
-If a host port is already taken, set `THYMBLE_API_PORT`, `POWERSYNC_PORT`, `POSTGRES_PORT` or `REDIS_PORT` in `.env`.
+If a host port is already taken, set `THYMBLE_API_PORT`, `POWERSYNC_PORT`, `POSTGRES_PORT`, `REDIS_PORT` or `MAILPIT_PORT` in `.env`.
 
 ### Layout
 
@@ -69,7 +70,22 @@ Everything is configured through environment variables; `.env.example` lists the
 
 ### PowerSync
 
-PowerSync reads Postgres through logical replication (`wal_level=logical`) as `powersync_role`, and keeps its bucket storage in a separate `powersync_storage` database on the same server; `deploy/postgres/init-powersync.sh` creates both the first time the data volume is initialized. Devices authenticate to PowerSync with short-lived HS256 JWTs (`aud: thymble-powersync`, `sub`: the user id) signed with `POWERSYNC_JWT_SECRET`; the api will mint these once auth lands.
+PowerSync reads Postgres through logical replication (`wal_level=logical`) as `powersync_role`, and keeps its bucket storage in a separate `powersync_storage` database on the same server; `deploy/postgres/init-powersync.sh` creates both the first time the data volume is initialized. Devices authenticate to PowerSync with short-lived HS256 JWTs (`aud: thymble-powersync`, `sub`: the user id) signed with `POWERSYNC_JWT_SECRET`; the app gets them from `GET /v1/sync/token`. Client writes go back through the api (`POST /v1/sync/upload`), never straight to Postgres; see below.
+
+### Accounts and auth
+
+Sign-in methods (architecture §9, D-015):
+
+- **Sign in with Apple:** the app sends Apple's identity token and the raw nonce to `POST /v1/auth/apple`. The api checks the signature against Apple's published keys (fetched from `appleid.apple.com` and cached), the issuer, the audience (`APPLE_BUNDLE_ID`), expiry, and that the token's nonce is SHA-256 of the raw nonce. Leave `APPLE_BUNDLE_ID` blank to turn it off.
+- **Email magic link:** `POST /v1/auth/email/request` emails a link (`MAGIC_LINK_URL?token=...`, a universal link into the app); the app then posts the token to `POST /v1/auth/email/verify`. Links are single-use and expire after `MAGIC_LINK_TTL_MINUTES`. The request endpoint answers the same way whether or not an account exists, and is rate-limited per address and per client. Without SMTP settings, email sign-in is off and `/v1/capabilities` reports `email_sign_in: false`. In development, mail goes to the Mailpit container: open `http://localhost:8025` (or `MAILPIT_PORT`) to read it.
+
+Both return the api's own tokens: a short-lived access token (HS256 JWT signed with `AUTH_JWT_SECRET`, sent as `Authorization: Bearer ...`) and a refresh token. Refresh tokens are opaque, stored only as hashes, and rotate on every `POST /v1/auth/refresh`; presenting an already-used refresh token revokes that whole sign-in (theft detection). `POST /v1/auth/logout` revokes one device, `POST /v1/auth/logout-all` every device. `GET /v1/me` returns the user and their households.
+
+**Households** are the data boundary. A user gets a household on first sign-in. Owners invite people with single-use codes (`POST /v1/households/{id}/invites`), rename the household, change roles and remove members; anyone can `POST /v1/households/join` with a code and `POST /v1/households/{id}/leave`. Every household route, and every synced write, checks membership; non-members get 404.
+
+**Sync writes.** `POST /v1/sync/upload` takes the PowerSync upload queue (`{"batch": [{"op": "PUT"|"PATCH"|"DELETE", "table", "id", "opData"}]}`) and applies it in one transaction: each row must belong to one of the user's households, rows can't move between households, foreign keys must point into the same household, and only registered tables and columns are accepted (`GET /v1/sync/tables` lists them). DELETE is a soft delete. A 4xx names the failing entry and nothing is written; the client should report and drop that batch rather than retry it. New features make their tables writable with `thymble.sync.register(SyncTable(Model, ...))`; see `src/thymble/sync/registry.py`.
+
+Alexa account linking will need an OAuth2 authorization-code endpoint; tokens already carry a `client_id` so it can reuse the same token machinery (see `src/thymble/auth/__init__.py`).
 
 ## Contributing
 See [CONTRIBUTING.md](CONTRIBUTING.md). Contributions are signed off under the [Developer Certificate of Origin](https://developercertificate.org/).

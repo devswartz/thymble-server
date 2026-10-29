@@ -50,6 +50,22 @@ class Settings(BaseSettings):
     smtp_username: str = ""
     smtp_password: SecretStr = SecretStr("")
     smtp_from: str = ""
+    # starttls (port 587), ssl (port 465) or none (local test servers such as Mailpit)
+    smtp_security: Literal["starttls", "ssl", "none"] = "starttls"
+
+    # Auth (architecture §9). Access tokens are HS256 JWTs signed with AUTH_JWT_SECRET.
+    auth_jwt_secret: SecretStr = SecretStr("")
+    access_token_ttl_seconds: int = 900
+    refresh_token_ttl_days: int = 60
+    powersync_token_ttl_seconds: int = 600
+    # Sign in with Apple: the app's bundle id (the identity token's audience).
+    # Comma-separated to also accept e.g. a Services ID. Empty turns Apple sign-in off.
+    apple_bundle_id: str = ""
+    # Where magic links point (a universal link the app opens); "?token=..." is appended.
+    # Defaults to THYMBLE_PUBLIC_URL + "/auth/email".
+    magic_link_url: str = ""
+    magic_link_ttl_minutes: int = 15
+    household_invite_ttl_hours: int = 168
 
     # Feature switches reported through /v1/capabilities
     photo_import_enabled: bool = True
@@ -88,6 +104,10 @@ class Settings(BaseSettings):
     @property
     def email_sign_in(self) -> bool:
         return bool(self.smtp_host and self.smtp_from)
+
+    @property
+    def apple_audiences(self) -> list[str]:
+        return [part.strip() for part in self.apple_bundle_id.split(",") if part.strip()]
 
 
 def normalize_db_url(url: str) -> str:
