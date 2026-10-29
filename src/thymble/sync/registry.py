@@ -8,7 +8,8 @@ DELETE for it:
 
 By default every column except the system columns (`id`, `household_id`, `created_at`,
 `updated_at`, `deleted_at`) is writable. Narrow it with `columns=` (allow-list) or
-`readonly=` (deny-list), and set server-owned values in `before_write`.
+`readonly=` (deny-list), and set server-owned values in `before_write` (raise
+`WriteRejected` there to refuse an entry).
 
 Every write is checked generically, whatever the table:
 - the row's household must be one the user belongs to; rows never move households;
@@ -39,6 +40,10 @@ class WriteContext:
     db: Session
     user: User
     household_ids: set[uuid.UUID]
+
+
+class WriteRejected(Exception):
+    """Raised by a `before_write` hook to refuse an entry (the upload answers 422)."""
 
 
 # (context, row, op, inserting, changes) -> None. Runs after client values are applied.

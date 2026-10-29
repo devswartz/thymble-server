@@ -10,7 +10,17 @@ import pytest
 from sqlalchemy import func, select
 
 from tests.auth.conftest import SignedIn
-from thymble.models import Ingredient, Recipe, RecipeStep, ShoppingItem, ShoppingList
+from thymble.models import (
+    Ingredient,
+    MealPlanEntry,
+    Recipe,
+    RecipeStep,
+    ShoppingItem,
+    ShoppingItemSource,
+    ShoppingList,
+    Store,
+    Trip,
+)
 from thymble.sync import SyncTable, register, registered_tables
 
 pytestmark = pytest.mark.db
@@ -265,3 +275,125 @@ def test_registry_rejects_unknown_columns():
     with pytest.raises(ValueError):
         register(SyncTable(Recipe, columns=frozenset({"nope"})))
     assert registered_tables()["recipe"].model is Recipe
+
+
+SERVER_ONLY_TABLES = {
+    "app_user",
+    "auth_email_token",
+    "auth_refresh_token",
+    "household",
+    "household_member",
+    "household_invite",
+    "import_job",
+    "llm_usage",
+    "llm_cache",
+    "connector_account",
+    "connector_item_link",
+    "learning_event",
+    "ingredient",
+    "ingredient_alias",
+}
+
+
+def test_server_only_tables_are_not_writable():
+    assert not SERVER_ONLY_TABLES & registered_tables().keys()
+
+
+def test_meal_plan_stores_and_trips(api, alice, bob, db):
+    hid = alice.household_id
+    rid, entry_id, store_id, group_id, member_id, trip_id = (uuid.uuid4() for _ in range(6))
+    list_id, item_id = uuid.uuid4(), uuid.uuid4()
+    response = upload(
+        api,
+        alice,
+        put("recipe", rid, household_id=hid, title="Chili"),
+        put("shopping_list", list_id, household_id=hid, name="L"),
+        put("shopping_item", item_id, household_id=hid, list_id=str(list_id), display_text="x"),
+        put(
+            "meal_plan_entry",
+            entry_id,
+            household_id=hid,
+            date="2026-11-02",
+            meal_slot="dinner",
+            recipe_id=str(rid),
+            servings=4,
+        ),
+        put("store", store_id, household_id=hid, name="Aldi", chain="aldi"),
+        put("store_group", group_id, household_id=hid, name="Everyday", is_default=True),
+        put(
+            "store_group_member",
+            member_id,
+            household_id=hid,
+            store_group_id=str(group_id),
+            store_id=str(store_id),
+        ),
+        put("trip", trip_id, household_id=hid, store_id=str(store_id), kind="in_store"),
+    )
+    assert response.status_code == 200, response.text
+    assert db.get(MealPlanEntry, entry_id).recipe_id == rid
+    trip = db.get(Trip, trip_id)
+    assert str(trip.user_id) == alice.user_id and trip.status == "planning"
+
+    # Server-owned columns stay server-owned.
+    for entry in (
+        patch("trip", trip_id, status="done"),
+        patch("store", store_id, external_list_id="todo.costco"),
+        patch("shopping_item", item_id, trip_id=str(trip_id)),
+        patch("shopping_item", item_id, bridge_of=str(item_id)),
+    ):
+        response = upload(api, alice, entry)
+        assert response.status_code == 422, entry
+        assert "not writable" in response.json()["detail"]["error"]
+    assert db.get(Store, store_id).external_list_id is None
+
+    # Bob can't plan meals with Alice's recipe.
+    response = upload(
+        api,
+        bob,
+        put(
+            "meal_plan_entry",
+            uuid.uuid4(),
+            household_id=bob.household_id,
+            date="2026-11-02",
+            meal_slot="lunch",
+            recipe_id=str(rid),
+        ),
+    )
+    assert response.status_code == 422
+    assert "another household" in response.json()["detail"]["error"]
+
+
+def test_item_sources(api, alice, db):
+    hid = alice.household_id
+    list_id, item_id, source_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    batch = [
+        put("shopping_list", list_id, household_id=hid, name="L"),
+        put("shopping_item", item_id, household_id=hid, list_id=str(list_id), display_text="x"),
+    ]
+    response = upload(
+        api,
+        alice,
+        *batch,
+        put(
+            "shopping_item_source",
+            source_id,
+            household_id=hid,
+            shopping_item_id=str(item_id),
+            source_type="manual",
+        ),
+    )
+    assert response.status_code == 200, response.text
+    assert db.get(ShoppingItemSource, source_id).source_type == "manual"
+    response = upload(
+        api,
+        alice,
+        put(
+            "shopping_item_source",
+            uuid.uuid4(),
+            household_id=hid,
+            shopping_item_id=str(item_id),
+            source_type="connector",
+        ),
+    )
+    assert response.status_code == 422
+    assert "server" in response.json()["detail"]["error"]

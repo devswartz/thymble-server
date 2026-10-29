@@ -29,7 +29,7 @@ from sqlalchemy.orm import Session
 
 from thymble.auth.tokens import now
 from thymble.models import HouseholdMember, User
-from thymble.sync.registry import Op, SyncTable, WriteContext, get_table
+from thymble.sync.registry import Op, SyncTable, WriteContext, WriteRejected, get_table
 
 
 class UploadError(Exception):
@@ -251,7 +251,7 @@ def apply_batch(db: Session, user: User, household_ids: set[uuid.UUID], entries:
                 db.flush()
             except _Forbidden as exc:
                 raise UploadError(403, index, entry, str(exc)) from exc
-            except _Invalid as exc:
+            except (_Invalid, WriteRejected) as exc:
                 raise UploadError(422, index, entry, str(exc)) from exc
             except (IntegrityError, DataError) as exc:
                 message = str(exc.orig).splitlines()[0] if exc.orig else "constraint violated"
