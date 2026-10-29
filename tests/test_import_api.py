@@ -278,3 +278,35 @@ def test_imports_need_sign_in_in_every_environment():
     for env_name in ("production", "development"):
         client = TestClient(create_app(authed_settings(thymble_env=env_name)))
         assert client.post("/v1/imports", json={"text": "x"}).status_code == 401
+
+
+def test_without_an_llm_every_line_is_still_linked(sm):
+    """No LLM: unseen names become household ingredients, so the list gets clean names."""
+    from thymble.models import Ingredient, Recipe, RecipeIngredient
+
+    settings = authed_settings()
+    member = create_member(sm, settings)
+    app = create_app(settings)
+    llm = LLMClient(settings, providers={}, store=DbStore(sm))
+
+    def db():
+        with sm() as session:
+            yield session
+
+    async def enqueue(job_id: str) -> None:
+        await import_recipe({"settings": settings, "sessionmaker": sm, "llm": llm}, job_id)
+
+    app.dependency_overrides[get_db] = db
+    app.dependency_overrides[get_enqueue] = lambda: enqueue
+    client = TestClient(app)
+    job_id = post_page(client, member).json()["id"]
+    status = client.get(f"/v1/imports/{job_id}", headers=member.headers).json()
+    assert status["status"] == "done", status
+    with sm() as session:
+        recipe = session.get(Recipe, uuid.UUID(status["recipe_id"]))
+        lines = session.scalars(
+            select(RecipeIngredient).where(RecipeIngredient.recipe_id == recipe.id)
+        ).all()
+        assert lines and all(line.ingredient_id for line in lines)
+        names = {session.get(Ingredient, line.ingredient_id).name for line in lines}
+        assert "onion" in names  # as written; with an LLM it maps to "yellow onion"

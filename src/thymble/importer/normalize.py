@@ -6,7 +6,10 @@
 2. `IngredientResolver` links each name to the `ingredient` catalog: household alias -> global
    alias -> ingredient name -> dictionary (global ingredient) -> LLM (task T4). A name the LLM
    maps is stored as a household alias and recorded as an `alias_learned` learning event, so
-   the next import answers it from the database.
+   the next import answers it from the database. When no LLM answers (none configured, or
+   it failed), the name becomes a household ingredient as written, like a name typed into
+   the shopping list: every line stays linked, so "salt and pepper" still reaches the list
+   as two items and recipe lines merge with what the household already has.
 """
 
 from __future__ import annotations
@@ -195,7 +198,7 @@ class IngredientResolver:
             household_id=self.household_id,
         )
         if not result.ok or result.data is None:
-            return None
+            return await asyncio.to_thread(self._household_ingredient, key)
         return await asyncio.to_thread(self._learn, key, result.data, result.provider)
 
     # ---- database (sync, run in a thread)
@@ -258,6 +261,21 @@ class IngredientResolver:
             ingredient = Ingredient(
                 household_id=None, name=compound.canonical, category=compound.category
             )
+            session.add(ingredient)
+            session.commit()
+            return ingredient.id
+
+    def _household_ingredient(self, key: str) -> uuid.UUID:
+        """No LLM answer: the household's own ingredient under the parsed name. No alias or
+        learning event: nothing was learned, and a later import with an LLM can still map
+        other spellings onto it."""
+        from thymble.models import Ingredient
+
+        with self._sessionmaker() as session:
+            existing = self._ingredient_by_name(session, [key])
+            if existing is not None:
+                return existing
+            ingredient = Ingredient(household_id=self.household_id, name=key)
             session.add(ingredient)
             session.commit()
             return ingredient.id
