@@ -43,6 +43,31 @@ class Settings(BaseSettings):
     openai_compatible_base_url: str = ""
     openai_compatible_api_key: SecretStr = SecretStr("")
     local_model: str = ""
+    # LLM module (thymble.llm): models, per-task routing (LLM_ROUTE_T1..T8), guards.
+    anthropic_model_small: str = "claude-haiku-5-5"
+    anthropic_model_large: str = "claude-sonnet-5-5"
+    # Vision model for photo transcription on the local endpoint; empty = LOCAL_MODEL.
+    local_vision_model: str = ""
+    llm_route_t1: str = ""
+    llm_route_t2: str = ""
+    llm_route_t3: str = ""
+    llm_route_t4: str = ""
+    llm_route_t5: str = ""
+    llm_route_t6: str = ""
+    llm_route_t7: str = ""
+    llm_route_t8: str = ""
+    llm_timeout_seconds: float = 90.0
+    llm_local_timeout_seconds: float = 120.0
+    # Fall back to the other configured provider when the routed one fails or times out.
+    llm_fallback: bool = True
+    # Per-household monthly cap on uncached LLM tokens (input + output); 0 = no cap.
+    llm_household_monthly_token_limit: int = 0
+
+    # Recipe import (thymble.importer)
+    import_server_fetch_enabled: bool = True
+    import_fetch_timeout_seconds: float = 20.0
+    import_max_html_bytes: int = 5_000_000
+    import_max_photo_bytes: int = 10_000_000
 
     # Email sign-in (magic links)
     smtp_host: str = ""
