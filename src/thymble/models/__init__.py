@@ -1,6 +1,7 @@
 """All ORM models. Importing this package registers every table on `Base.metadata`."""
 
 from thymble.db.base import Base
+from thymble.models.auth import EmailLoginToken, HouseholdInvite, RefreshToken
 from thymble.models.catalog import Ingredient, IngredientAlias
 from thymble.models.connectors import ConnectorAccount, ConnectorItemLink
 from thymble.models.identity import Household, HouseholdMember, HouseholdRole, User
@@ -31,7 +32,9 @@ __all__ = [
     "Base",
     "ConnectorAccount",
     "ConnectorItemLink",
+    "EmailLoginToken",
     "Household",
+    "HouseholdInvite",
     "HouseholdMember",
     "HouseholdRole",
     "Ingredient",
@@ -48,6 +51,7 @@ __all__ = [
     "RecipeSourceType",
     "RecipeStep",
     "RecipeTag",
+    "RefreshToken",
     "ShoppingItem",
     "ShoppingItemSource",
     "ShoppingList",
