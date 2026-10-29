@@ -1,0 +1,43 @@
+# PowerSync service configuration (self-hosted, "unified" mode).
+# Values tagged !env are read from the container environment; no secrets in this file.
+# Reference: https://docs.powersync.com/self-hosting
+
+telemetry:
+  disable_telemetry_sharing: true
+
+replication:
+  connections:
+    - type: postgresql
+      uri: !env PS_DATA_SOURCE_URI
+      sslmode: disable
+
+# Bucket storage: a separate database on the same Postgres server.
+storage:
+  type: postgresql
+  uri: !env PS_STORAGE_SOURCE_URI
+  sslmode: disable
+
+port: 8080
+
+sync_config:
+  path: sync-config.yaml
+
+# Clients authenticate with short-lived HS256 JWTs minted by the Thymble api
+# (architecture §9). The key is shared through POWERSYNC_JWT_SECRET (base64url).
+client_auth:
+  jwks:
+    keys:
+      - kty: oct
+        alg: HS256
+        kid: thymble-api
+        k: !env PS_JWT_SECRET
+  audience: ["thymble-powersync"]
+
+api:
+  tokens:
+    - !env PS_API_TOKEN
+
+system:
+  logging:
+    level: info
+    format: text

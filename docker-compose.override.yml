@@ -1,0 +1,39 @@
+# Local development overrides, applied automatically by `docker compose up`.
+# Production deployments run with `-f docker-compose.yml` only.
+#  - builds the dev image (test + lint tools)
+#  - bind-mounts the source tree and runs uvicorn / arq with auto-reload
+#  - exposes Postgres and Redis on localhost for tools
+
+services:
+  migrate:
+    build:
+      target: dev
+    image: thymble-server:dev
+    volumes:
+      - .:/app
+
+  api:
+    build:
+      target: dev
+    image: thymble-server:dev
+    environment:
+      THYMBLE_ENV: development
+      PYTEST_ADDOPTS: "-p no:cacheprovider"
+    volumes:
+      - .:/app
+
+  worker:
+    build:
+      target: dev
+    image: thymble-server:dev
+    command: ["arq", "thymble.worker.WorkerSettings", "--watch", "src"]
+    volumes:
+      - .:/app
+
+  postgres:
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-15432}:5432"
+
+  redis:
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-16379}:6379"

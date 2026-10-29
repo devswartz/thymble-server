@@ -1,0 +1,28 @@
+# What each device downloads. Everything is scoped to the households the signed-in
+# user belongs to (auth.user_id() is the JWT `sub`, i.e. app_user.id).
+#
+# Skeleton: only households, members, recipes and shopping items sync so far.
+# Server-only tables (connector_account, connector_item_link, llm_cache) must never
+# be added here: they hold credentials or cross-household data.
+config:
+  edition: 3
+
+with:
+  my_households: >-
+    SELECT household_id FROM household_member
+    WHERE user_id = auth.user_id() AND deleted_at IS NULL
+
+streams:
+  households:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM household WHERE id IN my_households
+      - SELECT * FROM household_member WHERE household_id IN my_households
+
+  recipes:
+    auto_subscribe: true
+    query: SELECT * FROM recipe WHERE household_id IN my_households
+
+  shopping:
+    auto_subscribe: true
+    query: SELECT * FROM shopping_item WHERE household_id IN my_households
