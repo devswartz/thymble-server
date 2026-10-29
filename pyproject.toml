@@ -12,6 +12,7 @@ dependencies = [
     "arq>=0.26",
     "beautifulsoup4>=4.12",
     "charset-normalizer>=3.4",
+    "cryptography>=44",
     "fastapi>=0.115",
     "httpx>=0.28",
     "ingredient-parser-nlp>=2.9",
@@ -22,12 +23,14 @@ dependencies = [
     "recipe-scrapers>=15.13",
     "sqlalchemy>=2.0.36",
     "uvicorn[standard]>=0.32",
+    "websockets>=14",
 ]
 
 [dependency-groups]
 dev = [
     "httpx>=0.28",
     "pytest>=8.3",
+    "pytest-asyncio>=0.25",
     "ruff>=0.8",
 ]
 
@@ -49,6 +52,7 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
     "db: needs a reachable PostgreSQL server (set DATABASE_URL)",
 ]

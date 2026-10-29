@@ -92,6 +92,9 @@ class Settings(BaseSettings):
     magic_link_ttl_minutes: int = 15
     household_invite_ttl_hours: int = 168
 
+    # Encrypts connector credentials at rest (HA tokens, retailer OAuth tokens).
+    connector_encryption_key: SecretStr = SecretStr("")
+
     # Feature switches reported through /v1/capabilities
     photo_import_enabled: bool = True
     connectors_lists: CommaList = Field(default_factory=list)
