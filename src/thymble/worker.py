@@ -11,6 +11,7 @@ from typing import Any, ClassVar
 from arq.connections import RedisSettings
 
 from thymble.config import get_settings
+from thymble.importer.jobs import import_recipe, warm_up
 
 log = logging.getLogger("thymble.worker")
 
@@ -29,10 +30,11 @@ async def startup(ctx: dict[str, Any]) -> None:
         log.addHandler(handler)
         log.propagate = False
     log.setLevel(get_settings().log_level.upper())
+    await warm_up(ctx)
     log.info("worker started")
 
 
 class WorkerSettings:
-    functions: ClassVar = [noop]
+    functions: ClassVar = [noop, import_recipe]
     on_startup = startup
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)

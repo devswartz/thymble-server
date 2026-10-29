@@ -1,0 +1,103 @@
+# Compound product names (architecture §5.6, D-019): multi-word grocery products that must stay
+# whole ("all-purpose flour" is one product, not "flour" + a modifier), with common spellings.
+# Part of the ingredient catalog: a name that resolves here links to a global ingredient.
+#
+# Format: canonical name | category | variant; variant; ...
+# Categories: produce, dairy, meat, seafood, bakery, pantry, baking, spices, condiments,
+#             oils, frozen, beverages, household
+all-purpose flour | baking | all purpose flour; ap flour; plain flour
+bread flour | baking |
+cake flour | baking |
+self-rising flour | baking | self-raising flour; self raising flour; self rising flour
+whole wheat flour | baking | whole-wheat flour; wholemeal flour
+almond flour | baking | almond meal
+baking soda | baking | bicarbonate of soda; bicarb soda; sodium bicarbonate
+baking powder | baking |
+cream of tartar | baking |
+vanilla extract | baking | pure vanilla extract; vanilla essence
+granulated sugar | baking | white sugar; caster sugar; castor sugar; superfine sugar
+light brown sugar | baking |
+dark brown sugar | baking |
+brown sugar | baking |
+powdered sugar | baking | confectioners sugar; confectioners' sugar; icing sugar
+chocolate chips | baking | chocolate chip; semisweet chocolate chips; semi-sweet chocolate chips
+cocoa powder | baking | unsweetened cocoa powder; cocoa
+cornstarch | baking | corn starch; cornflour
+active dry yeast | baking | dry yeast
+instant yeast | baking | rapid rise yeast
+kosher salt | spices | coarse kosher salt
+sea salt | spices | flaky sea salt
+table salt | spices |
+black pepper | spices | ground black pepper; freshly ground black pepper; black peppercorns
+red pepper flakes | spices | crushed red pepper flakes; crushed red pepper; chili flakes
+garlic powder | spices |
+onion powder | spices |
+smoked paprika | spices |
+ground cinnamon | spices | cinnamon powder
+ground cumin | spices | cumin powder
+bay leaves | spices | bay leaf
+extra-virgin olive oil | oils | extra virgin olive oil; evoo
+olive oil | oils |
+vegetable oil | oils |
+canola oil | oils |
+sesame oil | oils | toasted sesame oil
+coconut oil | oils |
+cooking spray | oils | nonstick cooking spray; non-stick cooking spray
+unsalted butter | dairy |
+salted butter | dairy |
+heavy cream | dairy | heavy whipping cream; double cream; whipping cream
+sour cream | dairy |
+cream cheese | dairy |
+half-and-half | dairy | half and half
+whole milk | dairy |
+buttermilk | dairy |
+greek yogurt | dairy | greek-style yogurt; greek yoghurt
+parmesan cheese | dairy | parmesan; parmigiano-reggiano; parmigiano reggiano
+cheddar cheese | dairy | cheddar; sharp cheddar cheese
+mozzarella cheese | dairy | mozzarella
+feta cheese | dairy | feta
+egg yolks | dairy | egg yolk
+egg whites | dairy | egg white
+soy sauce | condiments | soya sauce; light soy sauce
+fish sauce | condiments |
+oyster sauce | condiments |
+hoisin sauce | condiments | hoisin
+worcestershire sauce | condiments | worcestershire
+dijon mustard | condiments | dijon
+apple cider vinegar | condiments | cider vinegar
+red wine vinegar | condiments |
+balsamic vinegar | condiments |
+rice vinegar | condiments | rice wine vinegar
+tomato paste | pantry | tomato puree concentrate
+tomato sauce | pantry |
+crushed tomatoes | pantry |
+diced tomatoes | pantry | canned diced tomatoes
+coconut milk | pantry | canned coconut milk
+chicken broth | pantry | chicken stock
+beef broth | pantry | beef stock
+vegetable broth | pantry | vegetable stock
+peanut butter | pantry |
+maple syrup | pantry | pure maple syrup
+rolled oats | pantry | old-fashioned oats; old fashioned oats
+panko breadcrumbs | pantry | panko; panko bread crumbs
+breadcrumbs | pantry | bread crumbs; dried breadcrumbs
+green onions | produce | scallions; spring onions; green onion; scallion
+red onion | produce | red onions
+yellow onion | produce | yellow onions
+bell pepper | produce | bell peppers; sweet pepper
+sweet potatoes | produce | sweet potato
+baby spinach | produce |
+cherry tomatoes | produce | cherry tomato; grape tomatoes
+lemon juice | produce | fresh lemon juice
+lime juice | produce | fresh lime juice
+lemon zest | produce |
+fresh parsley | produce | flat-leaf parsley; italian parsley
+ground beef | meat | beef mince; minced beef
+ground turkey | meat | turkey mince
+chicken breasts | meat | chicken breast; boneless skinless chicken breasts
+chicken thighs | meat | chicken thigh; boneless skinless chicken thighs
+puff pastry | frozen | frozen puff pastry
+frozen peas | frozen |
+paper towels | household | paper towel
+aluminum foil | household | tin foil; aluminium foil
+parchment paper | household | baking paper
