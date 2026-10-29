@@ -7,7 +7,17 @@ import uuid
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import CheckConstraint, ForeignKey, Integer, Numeric, SmallInteger, String, Text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    ForeignKey,
+    Integer,
+    Numeric,
+    SmallInteger,
+    String,
+    Text,
+    false,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -44,6 +54,8 @@ class Recipe(SyncedBase, Base):
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("app_user.id", ondelete="SET NULL")
     )
+    # True while an imported recipe waits for the user's review (import pipeline §5.8).
+    is_draft: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
 
 
 class RecipeIngredient(SyncedBase, Base):
