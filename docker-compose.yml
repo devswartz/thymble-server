@@ -1,0 +1,101 @@
+# Thymble server stack. Production-shaped; local development layers
+# docker-compose.override.yml on top automatically (see README "Development").
+#
+# Configuration comes from .env (copy .env.example; never commit .env).
+
+x-app: &app
+  image: thymble-server:local
+  build:
+    context: .
+  env_file: .env
+  environment:
+    POSTGRES_HOST: postgres
+    REDIS_URL: redis://redis:6379/0
+  restart: unless-stopped
+
+services:
+  migrate:
+    <<: *app
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    ports:
+      - "${THYMBLE_API_PORT:-8000}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  worker:
+    <<: *app
+    command: ["arq", "thymble.worker.WorkerSettings"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=10", "-c", "max_wal_senders=10"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-thymble}
+      POSTGRES_DB: ${POSTGRES_DB:-thymble}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POWERSYNC_DB_PASSWORD: ${POWERSYNC_DB_PASSWORD:?set POWERSYNC_DB_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./deploy/postgres/init-powersync.sh:/docker-entrypoint-initdb.d/10-powersync.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  powersync:
+    image: journeyapps/powersync-service:1.27.2
+    command: ["start", "-r", "unified"]
+    environment:
+      POWERSYNC_CONFIG_PATH: /config/config.yaml
+      NODE_OPTIONS: --max-old-space-size=1000
+      PS_DATA_SOURCE_URI: postgresql://powersync_role:${POWERSYNC_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-thymble}
+      PS_STORAGE_SOURCE_URI: postgresql://powersync_role:${POWERSYNC_DB_PASSWORD}@postgres:5432/powersync_storage
+      PS_JWT_SECRET: ${POWERSYNC_JWT_SECRET:?set POWERSYNC_JWT_SECRET in .env}
+      PS_API_TOKEN: ${POWERSYNC_API_TOKEN:?set POWERSYNC_API_TOKEN in .env}
+    volumes:
+      - ./deploy/powersync:/config:ro
+    ports:
+      - "${POWERSYNC_PORT:-8080}:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
