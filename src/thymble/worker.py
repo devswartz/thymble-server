@@ -8,9 +8,11 @@ from __future__ import annotations
 import logging
 from typing import Any, ClassVar
 
+from arq import cron
 from arq.connections import RedisSettings
 
 from thymble.config import get_settings
+from thymble.shopping.jobs import start_connectors, stop_connectors, trip_reminders
 
 log = logging.getLogger("thymble.worker")
 
@@ -30,9 +32,16 @@ async def startup(ctx: dict[str, Any]) -> None:
         log.propagate = False
     log.setLevel(get_settings().log_level.upper())
     log.info("worker started")
+    await start_connectors(ctx)
+
+
+async def shutdown(ctx: dict[str, Any]) -> None:
+    await stop_connectors(ctx)
 
 
 class WorkerSettings:
-    functions: ClassVar = [noop]
+    functions: ClassVar = [noop, trip_reminders]
+    cron_jobs: ClassVar = [cron(trip_reminders, minute=set(range(0, 60, 5)), run_at_startup=True)]
     on_startup = startup
+    on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
