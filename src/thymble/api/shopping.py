@@ -101,9 +101,16 @@ def list_items(
 def add_item(list_id: uuid.UUID, body: ItemIn, db: DbSession, hh: Household) -> ItemResult:
     """Add (or merge into) an item. The item's home store is remembered for next time."""
     svc = service(db, hh)
+    store_id, remember = body.store_id, body.remember_store
     if body.text:
-        p = parse_entry(body.text)
+        p = parse_entry(body.text, svc.store_names())
         name, quantity, unit, urgent = p.name, p.quantity, p.unit, p.urgent or body.urgent
+        hinted = svc.store_for_hint(p.store_hint)
+        if hinted is not None and store_id is None and body.store_group_id is None:
+            # "bread from aldi": assign it there; it becomes the home only if it has none.
+            store_id = hinted.id
+            known = svc.resolve_ingredient(name)
+            remember = remember and (known is None or svc.home_of(known.id) is None)
     elif body.name:
         name, quantity, unit, urgent = body.name, body.quantity, body.unit, body.urgent
     else:
@@ -113,9 +120,9 @@ def add_item(list_id: uuid.UUID, body: ItemIn, db: DbSession, hh: Household) -> 
         name,
         quantity,
         unit,
-        store_id=body.store_id,
+        store_id=store_id,
         store_group_id=body.store_group_id,
-        remember=body.remember_store,
+        remember=remember,
         urgent=urgent,
     )
     gaps = svc.stop_gaps(result.item)

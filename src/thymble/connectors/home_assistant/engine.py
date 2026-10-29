@@ -687,13 +687,17 @@ class HASyncEngine:
                 self._pending_removals.append((entity, uid))
                 self.stats["pruned_completed"] += 1
                 return
-        parsed = parse_entry(summary)
+        svc = tx.svc
+        parsed = parse_entry(summary, svc.store_names())
         if not parsed.name.strip():
             return
-        svc = tx.svc
         ingredient = svc.resolve_ingredient(parsed.name)
+        has_home = ingredient is not None and svc.home_of(ingredient.id) is not None
         store_id = self.entity_stores.get(entity)
-        if store_id is not None and ingredient is not None and svc.home_of(ingredient.id):
+        hinted = svc.store_for_hint(parsed.store_hint)
+        if hinted is not None:
+            store_id = hinted.id  # a store said out loud ("bread from aldi") wins
+        elif store_id is not None and has_home:
             store_id = None  # a remembered home wins over the list it was said to
         result = svc.add_item(
             self.list_id,
@@ -701,6 +705,7 @@ class HASyncEngine:
             parsed.quantity,
             parsed.unit,
             store_id=store_id,
+            remember=not (hinted is not None and has_home),
             ingredient_id=ingredient.id if ingredient else None,
             resolve=False,
             source_type=ItemSourceType.CONNECTOR,

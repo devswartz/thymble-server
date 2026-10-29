@@ -193,3 +193,18 @@ def test_connector_needs_encryption_key(sessions, member):
         "kind": "home_assistant", "base_url": "http://ha:8123", "token": "t",
         "config": {"main_entity": "todo.x"}})  # fmt: skip
     assert r.status_code == 503
+
+
+def test_store_hint_in_text_assigns_the_store(api):
+    lst = ok(api.post("/v1/shopping/lists", json={"name": "L"}), 201)
+    aldi = ok(api.post("/v1/stores", json={"name": "Aldi"}), 201)
+    corner = ok(api.post("/v1/stores", json={"name": "Corner Market"}), 201)
+    items_url = f"/v1/shopping/lists/{lst['id']}/items"
+    bread = ok(api.post(items_url, json={"text": "bread from aldi"}), 201)["item"]
+    assert (bread["display_text"], bread["store_id"]) == ("bread", aldi["id"])
+    eggs = ok(api.post(items_url, json={"text": "urgent eggs at corner market"}), 201)["item"]
+    assert (eggs["display_text"], eggs["store_id"]) == ("eggs", corner["id"])
+    assert eggs["urgency"] == "urgent"
+    # A hint for a store the household doesn't have leaves the item unassigned.
+    milk = ok(api.post(items_url, json={"text": "milk from costco"}), 201)["item"]
+    assert (milk["display_text"], milk["store_id"]) == ("milk", None)

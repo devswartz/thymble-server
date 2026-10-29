@@ -39,6 +39,11 @@ from thymble.shopping import units
 from thymble.shopping.errors import NotFound, ShoppingError
 from thymble.shopping.text import STOPGAP_SUFFIX, name_key, name_variants
 
+
+def _store_key(name: str) -> str:
+    return "".join(ch for ch in name.lower() if ch.isalnum())
+
+
 # Purchases at one store outside the item's home before Thymble asks
 # "make this the usual store?" (§6.4).
 HOME_SUGGESTION_THRESHOLD = 3
@@ -191,6 +196,29 @@ class ShoppingService:
         return ing
 
     # -------------------------------------------------------------- stores
+    def _stores(self) -> list[Store]:
+        return list(
+            self.session.scalars(
+                select(Store)
+                .where(Store.household_id == self.household_id, Store.deleted_at.is_(None))
+                .order_by(Store.created_at)
+            )
+        )
+
+    def store_names(self) -> list[str]:
+        """The household's store names and chains, for store hints in voice entries."""
+        return [n for s in self._stores() for n in (s.name, s.chain) if n]
+
+    def store_for_hint(self, hint: str | None) -> Store | None:
+        """The household's store a voice entry named ("bread from aldi"), if it has one."""
+        if not hint:
+            return None
+        key = _store_key(hint)
+        for store in self._stores():
+            if key in {_store_key(store.name), _store_key(store.chain or "")}:
+                return store
+        return None
+
     def group_store_ids(self, group_id: uuid.UUID) -> set[uuid.UUID]:
         return set(
             self.session.scalars(

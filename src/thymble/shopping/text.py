@@ -2,12 +2,18 @@
 
 A small rules-only stand-in for the ingredient-parsing pipeline (architecture §5 step 5),
 good enough for voice entries from Alexa. Urgency keywords follow §6.4 / D-029:
-"urgent", "out of", "need" at the start, "urgent"/"asap" at the end.
+"urgent", "asap", "out of", "need" at the start (optionally with a colon), "urgent"/"asap"
+at the end. A store name at the start ("costco paper towels") or after "from"/"at" at the
+end ("bread from aldi") is a store hint. Non-food items are found by whole words, so
+"soapberries" is food and "dish soap" is not (D-033).
+
+These rules are pinned by the shared test vectors in tests/vectors/ (D-033).
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
@@ -17,8 +23,9 @@ from thymble.shopping.units import normalize_unit
 STOPGAP_SUFFIX = " (small)"
 
 _URGENT_PREFIX = re.compile(
-    r"^(?:(?:an?\s+)?urgent(?:ly)?|(?:we(?:'re| are)\s+|i'm\s+|i am\s+)?(?:all\s+)?out\s+of|"
-    r"(?:we\s+|i\s+)?(?:really\s+)?need(?:s)?(?:\s+(?:more|some))?)\s+",
+    r"^(?:(?:an?\s+)?urgent(?:ly)?\s*:?|asap\s*:?|"
+    r"(?:we(?:'re| are)\s+|i'm\s+|i am\s+)?(?:all\s+)?out\s+of|"
+    r"(?:we\s+|i\s+)?(?:really\s+)?need(?:s|ed)?(?:\s+(?:more|some))?)\s+",
     re.I,
 )
 _URGENT_SUFFIX = re.compile(r"[\s,(-]+(?:urgent(?:ly)?|asap)\)?\s*$", re.I)
@@ -35,12 +42,54 @@ _QTY = re.compile(
 )
 
 
+# Chains recognised as store hints without any household setup; a household's own store
+# names are added by the caller. Values are the canonical hint ("trader joe's").
+KNOWN_STORES: dict[str, str] = {
+    "costco": "costco",
+    "aldi": "aldi",
+    "walmart": "walmart",
+    "target": "target",
+    "kroger": "kroger",
+    "trader joe's": "trader joe's",
+    "trader joes": "trader joe's",
+    "sam's club": "sam's club",
+    "sams club": "sam's club",
+    "whole foods": "whole foods",
+    "safeway": "safeway",
+    "publix": "publix",
+    "lidl": "lidl",
+    "meijer": "meijer",
+    "wegmans": "wegmans",
+}
+
+# Whole words (an optional plural "s"/"es" is allowed) that make an item non-food.
+NON_FOOD_WORDS = (
+    "paper towel", "toilet paper", "tissue", "napkin", "soap", "detergent", "bleach",
+    "trash bag", "garbage bag", "zip-top bag", "sandwich bag", "aluminum foil", "foil",
+    "plastic wrap", "parchment paper", "coffee filter", "sponge", "battery", "batteries",
+    "light bulb", "charger", "diaper", "wipe", "shampoo", "conditioner", "toothpaste",
+    "toothbrush", "deodorant", "razor", "ibuprofen", "acetaminophen", "vitamin",
+    "cat food", "dog food", "cat litter", "kitty litter", "dryer sheet", "fabric softener",
+)  # fmt: skip
+_NON_FOOD = re.compile(
+    r"\b(?:" + "|".join(re.escape(w) for w in NON_FOOD_WORDS) + r")(?:s|es)?\b", re.I
+)
+
+
+def is_food(name: str) -> bool:
+    """False for household, pharmacy, pet and electronics items, matched by whole word."""
+    return _NON_FOOD.search(name) is None
+
+
 @dataclass(frozen=True)
 class ParsedEntry:
     name: str
     quantity: Decimal | None
     unit: str | None
     urgent: bool
+    # Lower-case store named in the entry ("costco"), or None.
+    store_hint: str | None = None
+    is_food: bool = True
 
 
 def _number(text: str) -> Decimal | None:
@@ -56,16 +105,46 @@ def _number(text: str) -> Decimal | None:
         return None
 
 
-def parse_entry(text: str) -> ParsedEntry:
+def _store_names(stores: Iterable[str]) -> dict[str, str]:
+    names = dict(KNOWN_STORES)
+    for store in stores:
+        key = " ".join(store.lower().split())
+        if key:
+            names.setdefault(key, key)
+    return names
+
+
+def _strip_store(t: str, stores: Iterable[str]) -> tuple[str, str | None]:
+    # Longest names first so "sam's club" wins over a store called "sam's".
+    for name, canonical in sorted(_store_names(stores).items(), key=lambda kv: -len(kv[0])):
+        pattern = re.escape(name)
+        m = re.match(rf"^{pattern}\s+(?=\S)", t, re.I)
+        if m:
+            return t[m.end() :], canonical
+        m = re.search(rf"\s+(?:from|at)\s+{pattern}\s*$", t, re.I)
+        if m:
+            return t[: m.start()], canonical
+    return t, None
+
+
+def parse_entry(text: str, stores: Iterable[str] = ()) -> ParsedEntry:
+    """Parse a spoken or typed list entry. `stores` adds the household's own store names
+    to the chains recognised as store hints."""
+    stores = list(stores)
     t = " ".join(text.strip().split())
     t = _OUR_SUFFIX.sub("", t)
     urgent = False
+    store_hint = None
     while True:
-        new = _URGENT_PREFIX.sub("", t, count=1)
-        new = _URGENT_SUFFIX.sub("", new)
-        if new == t:
+        before = t
+        stripped = _URGENT_SUFFIX.sub("", _URGENT_PREFIX.sub("", t, count=1)).strip()
+        if stripped != t:
+            urgent, t = True, stripped
+        if store_hint is None:
+            t, store_hint = _strip_store(t, stores)
+            t = t.strip()
+        if t == before:
             break
-        urgent, t = True, new.strip()
     quantity = unit = None
     m = _QTY.match(t)
     if m:
@@ -76,7 +155,15 @@ def parse_entry(text: str) -> ParsedEntry:
             unit = normalize_unit(raw_unit) if raw_unit else None
             if unit == "x":
                 unit = None
-    return ParsedEntry(name=t or text.strip(), quantity=quantity, unit=unit, urgent=urgent)
+    name = t or text.strip()
+    return ParsedEntry(
+        name=name,
+        quantity=quantity,
+        unit=unit,
+        urgent=urgent,
+        store_hint=store_hint,
+        is_food=is_food(name),
+    )
 
 
 def normalize_name(name: str) -> str:

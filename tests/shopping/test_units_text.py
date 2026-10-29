@@ -59,3 +59,11 @@ def test_format_quantity():
     assert format_quantity(Decimal("1.5"), "cups") == "1.5 cup"
     assert format_quantity(Decimal(3), None) == "3"
     assert format_quantity(None, "lb") == ""
+
+
+def test_household_store_names_are_hints():
+    from thymble.shopping.text import parse_entry
+
+    p = parse_entry("eggs from Corner Market", ["Corner Market"])
+    assert (p.name, p.store_hint) == ("eggs", "corner market")
+    assert parse_entry("eggs from Corner Market").store_hint is None

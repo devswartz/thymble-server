@@ -1,0 +1,1321 @@
+{
+  "version": 1,
+  "description": "Shared ingredient-line rule vectors (D-033). Synthetic lines written for Thymble; no third-party recipe text. Format: tests/vectors/README.md.",
+  "cases": [
+    {
+      "id": "Q01",
+      "kind": "recipe_line",
+      "tags": [
+        "quantity"
+      ],
+      "input": "2 cups all-purpose flour",
+      "expect": {
+        "quantity": 2,
+        "quantity_max": null,
+        "unit": "cup",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "all-purpose flour"
+      }
+    },
+    {
+      "id": "Q02",
+      "kind": "recipe_line",
+      "tags": [
+        "quantity",
+        "mixed-number"
+      ],
+      "input": "1 1/2 teaspoons baking soda",
+      "expect": {
+        "quantity": 1.5,
+        "quantity_max": null,
+        "unit": "tsp",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "baking soda"
+      }
+    },
+    {
+      "id": "Q03",
+      "kind": "recipe_line",
+      "tags": [
+        "quantity",
+        "decimal"
+      ],
+      "input": "0.75 cup whole milk",
+      "expect": {
+        "quantity": 0.75,
+        "quantity_max": null,
+        "unit": "cup",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "whole milk"
+      }
+    },
+    {
+      "id": "Q04",
+      "kind": "recipe_line",
+      "tags": [
+        "quantity",
+        "metric"
+      ],
+      "input": "250 g dark chocolate",
+      "expect": {
+        "quantity": 250,
+        "quantity_max": null,
+        "unit": "g",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "dark chocolate"
+      }
+    },
+    {
+      "id": "Q05",
+      "kind": "recipe_line",
+      "tags": [
+        "quantity",
+        "no-unit"
+      ],
+      "input": "4 carrots",
+      "expect": {
+        "quantity": 4,
+        "quantity_max": null,
+        "unit": null,
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "carrots"
+      }
+    },
+    {
+      "id": "G01",
+      "kind": "recipe_line",
+      "tags": [
+        "range",
+        "prep"
+      ],
+      "input": "2-3 cloves garlic, minced",
+      "expect": {
+        "quantity": 2,
+        "quantity_max": 3,
+        "unit": "clove",
+        "additional": [],
+        "alternatives": [],
+        "preparation": "minced",
+        "optional": false,
+        "ditto": false,
+        "name": "garlic"
+      }
+    },
+    {
+      "id": "G02",
+      "kind": "recipe_line",
+      "tags": [
+        "range"
+      ],
+      "input": "1 to 2 tablespoons honey",
+      "expect": {
+        "quantity": 1,
+        "quantity_max": 2,
+        "unit": "tbsp",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "honey"
+      }
+    },
+    {
+      "id": "G03",
+      "kind": "recipe_line",
+      "tags": [
+        "range",
+        "en-dash"
+      ],
+      "input": "4–6 small red potatoes",
+      "expect": {
+        "quantity": 4,
+        "quantity_max": 6,
+        "unit": null,
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "red potatoes"
+      }
+    },
+    {
+      "id": "F01",
+      "kind": "recipe_line",
+      "tags": [
+        "unicode-fraction"
+      ],
+      "input": "½ cup heavy cream",
+      "expect": {
+        "quantity": 0.5,
+        "quantity_max": null,
+        "unit": "cup",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "heavy cream"
+      }
+    },
+    {
+      "id": "F02",
+      "kind": "recipe_line",
+      "tags": [
+        "unicode-fraction",
+        "mixed-number"
+      ],
+      "input": "1¼ cups chicken stock",
+      "expect": {
+        "quantity": 1.25,
+        "quantity_max": null,
+        "unit": "cup",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "chicken stock"
+      }
+    },
+    {
+      "id": "F03",
+      "kind": "recipe_line",
+      "tags": [
+        "unicode-fraction"
+      ],
+      "input": "⅓ cup maple syrup",
+      "expect": {
+        "quantity": 0.3333,
+        "quantity_max": null,
+        "unit": "cup",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "maple syrup"
+      }
+    },
+    {
+      "id": "F04",
+      "kind": "recipe_line",
+      "tags": [
+        "unicode-fraction"
+      ],
+      "input": "¾ teaspoon smoked paprika",
+      "expect": {
+        "quantity": 0.75,
+        "quantity_max": null,
+        "unit": "tsp",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "smoked paprika"
+      }
+    },
+    {
+      "id": "U01",
+      "kind": "recipe_line",
+      "tags": [
+        "unit-alias"
+      ],
+      "input": "2 Tbsps unsalted butter",
+      "expect": {
+        "quantity": 2,
+        "quantity_max": null,
+        "unit": "tbsp",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "unsalted butter"
+      }
+    },
+    {
+      "id": "U02",
+      "kind": "recipe_line",
+      "tags": [
+        "unit-alias"
+      ],
+      "input": "1 tsp. vanilla extract",
+      "expect": {
+        "quantity": 1,
+        "quantity_max": null,
+        "unit": "tsp",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "vanilla extract"
+      }
+    },
+    {
+      "id": "U03",
+      "kind": "recipe_line",
+      "tags": [
+        "unit-alias",
+        "prep"
+      ],
+      "input": "8 oz cream cheese, softened",
+      "expect": {
+        "quantity": 8,
+        "quantity_max": null,
+        "unit": "oz",
+        "additional": [],
+        "alternatives": [],
+        "preparation": "softened",
+        "optional": false,
+        "ditto": false,
+        "name": "cream cheese"
+      }
+    },
+    {
+      "id": "U04",
+      "kind": "recipe_line",
+      "tags": [
+        "unit-alias"
+      ],
+      "input": "2 lbs. carrots",
+      "expect": {
+        "quantity": 2,
+        "quantity_max": null,
+        "unit": "lb",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "carrots"
+      }
+    },
+    {
+      "id": "U05",
+      "kind": "recipe_line",
+      "tags": [
+        "unit-alias",
+        "metric"
+      ],
+      "input": "500 ml vegetable broth",
+      "expect": {
+        "quantity": 500,
+        "quantity_max": null,
+        "unit": "ml",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "vegetable broth"
+      }
+    },
+    {
+      "id": "U06",
+      "kind": "recipe_line",
+      "tags": [
+        "unit-alias",
+        "cookbook-case"
+      ],
+      "input": "1 T olive oil",
+      "expect": {
+        "quantity": 1,
+        "quantity_max": null,
+        "unit": "tbsp",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "olive oil"
+      }
+    },
+    {
+      "id": "U07",
+      "kind": "recipe_line",
+      "tags": [
+        "unit-alias",
+        "cookbook-case"
+      ],
+      "input": "1 t baking powder",
+      "expect": {
+        "quantity": 1,
+        "quantity_max": null,
+        "unit": "tsp",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "baking powder"
+      }
+    },
+    {
+      "id": "U08",
+      "kind": "recipe_line",
+      "tags": [
+        "unit-alias"
+      ],
+      "input": "3 tins chickpeas",
+      "expect": {
+        "quantity": 3,
+        "quantity_max": null,
+        "unit": "can",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "chickpeas"
+      }
+    },
+    {
+      "id": "W01",
+      "kind": "recipe_line",
+      "tags": [
+        "word-number"
+      ],
+      "input": "a dozen eggs",
+      "expect": {
+        "quantity": 12,
+        "quantity_max": null,
+        "unit": null,
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "eggs"
+      }
+    },
+    {
+      "id": "W02",
+      "kind": "recipe_line",
+      "tags": [
+        "word-number"
+      ],
+      "input": "half a lemon",
+      "expect": {
+        "quantity": 0.5,
+        "quantity_max": null,
+        "unit": null,
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "lemon"
+      }
+    },
+    {
+      "id": "W03",
+      "kind": "recipe_line",
+      "tags": [
+        "word-number"
+      ],
+      "input": "two cloves garlic",
+      "expect": {
+        "quantity": 2,
+        "quantity_max": null,
+        "unit": "clove",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "garlic"
+      }
+    },
+    {
+      "id": "W04",
+      "kind": "recipe_line",
+      "tags": [
+        "word-number"
+      ],
+      "input": "a couple of bay leaves",
+      "expect": {
+        "quantity": 2,
+        "quantity_max": null,
+        "unit": null,
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "bay leaves"
+      }
+    },
+    {
+      "id": "W05",
+      "kind": "recipe_line",
+      "tags": [
+        "word-number"
+      ],
+      "input": "a pinch of nutmeg",
+      "expect": {
+        "quantity": 1,
+        "quantity_max": null,
+        "unit": "pinch",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "nutmeg"
+      }
+    },
+    {
+      "id": "W06",
+      "kind": "recipe_line",
+      "tags": [
+        "arithmetic"
+      ],
+      "input": "2 cups minus 2 tablespoons sugar",
+      "expect": {
+        "quantity": 1.875,
+        "quantity_max": null,
+        "unit": "cup",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "sugar"
+      }
+    },
+    {
+      "id": "D01",
+      "kind": "recipe_line",
+      "tags": [
+        "ditto"
+      ],
+      "input": "do.",
+      "previous": [
+        "1 cup rolled oats"
+      ],
+      "expect": {
+        "quantity": 1,
+        "quantity_max": null,
+        "unit": "cup",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": true,
+        "name": "rolled oats"
+      }
+    },
+    {
+      "id": "D02",
+      "kind": "recipe_line",
+      "tags": [
+        "ditto"
+      ],
+      "input": "same as above",
+      "previous": [
+        "1/2 cup raisins"
+      ],
+      "expect": {
+        "quantity": 0.5,
+        "quantity_max": null,
+        "unit": "cup",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": true,
+        "name": "raisins"
+      }
+    },
+    {
+      "id": "D03",
+      "kind": "recipe_line",
+      "tags": [
+        "ditto",
+        "ditto-quantity"
+      ],
+      "input": "2 do.",
+      "previous": [
+        "3 tablespoons flour"
+      ],
+      "expect": {
+        "quantity": 2,
+        "quantity_max": null,
+        "unit": "tbsp",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": true,
+        "name": "flour"
+      }
+    },
+    {
+      "id": "D04",
+      "kind": "recipe_line",
+      "tags": [
+        "ditto",
+        "ditto-quantity"
+      ],
+      "input": "1 \"",
+      "previous": [
+        "2 tablespoons butter"
+      ],
+      "expect": {
+        "quantity": 1,
+        "quantity_max": null,
+        "unit": "tbsp",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": true,
+        "name": "butter"
+      }
+    },
+    {
+      "id": "D05",
+      "kind": "recipe_line",
+      "tags": [
+        "ditto",
+        "ditto-name"
+      ],
+      "input": "\" nutmeg",
+      "previous": [
+        "1 teaspoon cinnamon"
+      ],
+      "expect": {
+        "quantity": 1,
+        "quantity_max": null,
+        "unit": "tsp",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": true,
+        "name": "nutmeg"
+      }
+    },
+    {
+      "id": "A01",
+      "kind": "recipe_line",
+      "tags": [
+        "and"
+      ],
+      "input": "salt and pepper",
+      "expect": {
+        "quantity": null,
+        "quantity_max": null,
+        "unit": null,
+        "additional": [
+          "pepper"
+        ],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "salt"
+      }
+    },
+    {
+      "id": "A02",
+      "kind": "recipe_line",
+      "tags": [
+        "and",
+        "ampersand"
+      ],
+      "input": "salt & pepper",
+      "expect": {
+        "quantity": null,
+        "quantity_max": null,
+        "unit": null,
+        "additional": [
+          "pepper"
+        ],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "salt"
+      }
+    },
+    {
+      "id": "A03",
+      "kind": "recipe_line",
+      "tags": [
+        "and",
+        "each"
+      ],
+      "input": "1 tsp EACH cumin and coriander",
+      "expect": {
+        "quantity": 1,
+        "quantity_max": null,
+        "unit": "tsp",
+        "additional": [
+          "coriander"
+        ],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "cumin"
+      }
+    },
+    {
+      "id": "A04",
+      "kind": "recipe_line",
+      "tags": [
+        "and-or"
+      ],
+      "input": "parsley and/or chives",
+      "expect": {
+        "quantity": null,
+        "quantity_max": null,
+        "unit": null,
+        "additional": [
+          "chives"
+        ],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "parsley"
+      }
+    },
+    {
+      "id": "O01",
+      "kind": "recipe_line",
+      "tags": [
+        "or"
+      ],
+      "input": "2 cups vegetable stock or water",
+      "expect": {
+        "quantity": 2,
+        "quantity_max": null,
+        "unit": "cup",
+        "additional": [],
+        "alternatives": [
+          "water"
+        ],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "vegetable stock"
+      }
+    },
+    {
+      "id": "O02",
+      "kind": "recipe_line",
+      "tags": [
+        "sub",
+        "parenthetical"
+      ],
+      "input": "1 tbsp soy sauce (sub tamari)",
+      "expect": {
+        "quantity": 1,
+        "quantity_max": null,
+        "unit": "tbsp",
+        "additional": [],
+        "alternatives": [
+          "tamari"
+        ],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "soy sauce"
+      }
+    },
+    {
+      "id": "O03",
+      "kind": "recipe_line",
+      "tags": [
+        "or",
+        "parenthetical"
+      ],
+      "input": "2 tbsp rice vinegar (or white wine vinegar)",
+      "expect": {
+        "quantity": 2,
+        "quantity_max": null,
+        "unit": "tbsp",
+        "additional": [],
+        "alternatives": [
+          "white wine vinegar"
+        ],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "rice vinegar"
+      }
+    },
+    {
+      "id": "O04",
+      "kind": "recipe_line",
+      "tags": [
+        "or",
+        "same-product",
+        "brand"
+      ],
+      "input": "2 tsp Diamond Crystal or 1 tsp Morton kosher salt",
+      "expect": {
+        "quantity": 2,
+        "quantity_max": null,
+        "unit": "tsp",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "kosher salt"
+      }
+    },
+    {
+      "id": "O05",
+      "kind": "recipe_line",
+      "tags": [
+        "same-product"
+      ],
+      "input": "2 tbsp cornflour / cornstarch",
+      "expect": {
+        "quantity": 2,
+        "quantity_max": null,
+        "unit": "tbsp",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "cornflour"
+      }
+    },
+    {
+      "id": "O06",
+      "kind": "recipe_line",
+      "tags": [
+        "or-as-needed"
+      ],
+      "input": "2 tbsp olive oil, or as needed",
+      "expect": {
+        "quantity": 2,
+        "quantity_max": null,
+        "unit": "tbsp",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "olive oil"
+      }
+    },
+    {
+      "id": "O07",
+      "kind": "recipe_line",
+      "tags": [
+        "no-split"
+      ],
+      "input": "1 cup half-and-half",
+      "expect": {
+        "quantity": 1,
+        "quantity_max": null,
+        "unit": "cup",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "half-and-half"
+      }
+    },
+    {
+      "id": "O08",
+      "kind": "recipe_line",
+      "tags": [
+        "no-split",
+        "prep"
+      ],
+      "input": "1 can black beans, drained and rinsed",
+      "expect": {
+        "quantity": 1,
+        "quantity_max": null,
+        "unit": "can",
+        "additional": [],
+        "alternatives": [],
+        "preparation": "drained and rinsed",
+        "optional": false,
+        "ditto": false,
+        "name": "black beans"
+      }
+    },
+    {
+      "id": "P01",
+      "kind": "recipe_line",
+      "tags": [
+        "prep",
+        "packed"
+      ],
+      "input": "1 cup packed brown sugar",
+      "expect": {
+        "quantity": 1,
+        "quantity_max": null,
+        "unit": "cup",
+        "additional": [],
+        "alternatives": [],
+        "preparation": "packed",
+        "optional": false,
+        "ditto": false,
+        "name": "brown sugar"
+      }
+    },
+    {
+      "id": "P02",
+      "kind": "recipe_line",
+      "tags": [
+        "prep",
+        "packed"
+      ],
+      "input": "2 cups spinach, tightly packed",
+      "expect": {
+        "quantity": 2,
+        "quantity_max": null,
+        "unit": "cup",
+        "additional": [],
+        "alternatives": [],
+        "preparation": "tightly packed",
+        "optional": false,
+        "ditto": false,
+        "name": "spinach"
+      }
+    },
+    {
+      "id": "P03",
+      "kind": "recipe_line",
+      "tags": [
+        "prep"
+      ],
+      "input": "3 tablespoons butter, melted",
+      "expect": {
+        "quantity": 3,
+        "quantity_max": null,
+        "unit": "tbsp",
+        "additional": [],
+        "alternatives": [],
+        "preparation": "melted",
+        "optional": false,
+        "ditto": false,
+        "name": "butter"
+      }
+    },
+    {
+      "id": "P04",
+      "kind": "recipe_line",
+      "tags": [
+        "prep"
+      ],
+      "input": "1 cup cake flour, sifted",
+      "expect": {
+        "quantity": 1,
+        "quantity_max": null,
+        "unit": "cup",
+        "additional": [],
+        "alternatives": [],
+        "preparation": "sifted",
+        "optional": false,
+        "ditto": false,
+        "name": "cake flour"
+      }
+    },
+    {
+      "id": "P05",
+      "kind": "recipe_line",
+      "tags": [
+        "prep",
+        "optional"
+      ],
+      "input": "1/4 cup walnuts, chopped (optional)",
+      "expect": {
+        "quantity": 0.25,
+        "quantity_max": null,
+        "unit": "cup",
+        "additional": [],
+        "alternatives": [],
+        "preparation": "chopped",
+        "optional": true,
+        "ditto": false,
+        "name": "walnuts"
+      }
+    },
+    {
+      "id": "P06",
+      "kind": "recipe_line",
+      "tags": [
+        "debris"
+      ],
+      "input": "▢ 2 Tbsps olive oil",
+      "expect": {
+        "quantity": 2,
+        "quantity_max": null,
+        "unit": "tbsp",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "olive oil"
+      }
+    },
+    {
+      "id": "V01",
+      "kind": "voice_item",
+      "tags": [
+        "voice"
+      ],
+      "input": "milk",
+      "expect": {
+        "quantity": null,
+        "unit": null,
+        "urgent": false,
+        "store": null,
+        "is_food": true,
+        "name": "milk"
+      }
+    },
+    {
+      "id": "V02",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "quantity"
+      ],
+      "input": "2 lbs chicken thighs",
+      "expect": {
+        "quantity": 2,
+        "unit": "lb",
+        "urgent": false,
+        "store": null,
+        "is_food": true,
+        "name": "chicken thighs"
+      }
+    },
+    {
+      "id": "V03",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "quantity"
+      ],
+      "input": "1 gallon whole milk",
+      "expect": {
+        "quantity": 1,
+        "unit": "gal",
+        "urgent": false,
+        "store": null,
+        "is_food": true,
+        "name": "whole milk"
+      }
+    },
+    {
+      "id": "V04",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "urgent",
+        "non-food"
+      ],
+      "input": "urgent toilet paper",
+      "expect": {
+        "quantity": null,
+        "unit": null,
+        "urgent": true,
+        "store": null,
+        "is_food": false,
+        "name": "toilet paper"
+      }
+    },
+    {
+      "id": "V05",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "urgent",
+        "non-food"
+      ],
+      "input": "Urgent: coffee filters",
+      "expect": {
+        "quantity": null,
+        "unit": null,
+        "urgent": true,
+        "store": null,
+        "is_food": false,
+        "name": "coffee filters"
+      }
+    },
+    {
+      "id": "V06",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "urgent"
+      ],
+      "input": "we're out of coffee",
+      "expect": {
+        "quantity": null,
+        "unit": null,
+        "urgent": true,
+        "store": null,
+        "is_food": true,
+        "name": "coffee"
+      }
+    },
+    {
+      "id": "V07",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "urgent",
+        "non-food"
+      ],
+      "input": "need batteries",
+      "expect": {
+        "quantity": null,
+        "unit": null,
+        "urgent": true,
+        "store": null,
+        "is_food": false,
+        "name": "batteries"
+      }
+    },
+    {
+      "id": "V08",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "urgent",
+        "non-food"
+      ],
+      "input": "paper towels asap",
+      "expect": {
+        "quantity": null,
+        "unit": null,
+        "urgent": true,
+        "store": null,
+        "is_food": false,
+        "name": "paper towels"
+      }
+    },
+    {
+      "id": "V09",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "store",
+        "non-food"
+      ],
+      "input": "costco paper towels",
+      "expect": {
+        "quantity": null,
+        "unit": null,
+        "urgent": false,
+        "store": "costco",
+        "is_food": false,
+        "name": "paper towels"
+      }
+    },
+    {
+      "id": "V10",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "store"
+      ],
+      "input": "bread from aldi",
+      "expect": {
+        "quantity": null,
+        "unit": null,
+        "urgent": false,
+        "store": "aldi",
+        "is_food": true,
+        "name": "bread"
+      }
+    },
+    {
+      "id": "V11",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "urgent",
+        "store",
+        "quantity"
+      ],
+      "input": "urgent 3 cans black beans at walmart",
+      "expect": {
+        "quantity": 3,
+        "unit": "can",
+        "urgent": true,
+        "store": "walmart",
+        "is_food": true,
+        "name": "black beans"
+      }
+    },
+    {
+      "id": "V12",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "store"
+      ],
+      "input": "Bananas from Trader Joes",
+      "expect": {
+        "quantity": null,
+        "unit": null,
+        "urgent": false,
+        "store": "trader joe's",
+        "is_food": true,
+        "name": "Bananas"
+      }
+    },
+    {
+      "id": "V13",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "store"
+      ],
+      "input": "target",
+      "expect": {
+        "quantity": null,
+        "unit": null,
+        "urgent": false,
+        "store": null,
+        "is_food": true,
+        "name": "target"
+      }
+    },
+    {
+      "id": "V14",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "non-food"
+      ],
+      "input": "dish soap",
+      "expect": {
+        "quantity": null,
+        "unit": null,
+        "urgent": false,
+        "store": null,
+        "is_food": false,
+        "name": "dish soap"
+      }
+    },
+    {
+      "id": "V15",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "non-food",
+        "whole-word"
+      ],
+      "input": "soapberries",
+      "expect": {
+        "quantity": null,
+        "unit": null,
+        "urgent": false,
+        "store": null,
+        "is_food": true,
+        "name": "soapberries"
+      }
+    },
+    {
+      "id": "V16",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "non-food"
+      ],
+      "input": "cat food",
+      "expect": {
+        "quantity": null,
+        "unit": null,
+        "urgent": false,
+        "store": null,
+        "is_food": false,
+        "name": "cat food"
+      }
+    },
+    {
+      "id": "V17",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "non-food",
+        "plural"
+      ],
+      "input": "sponges",
+      "expect": {
+        "quantity": null,
+        "unit": null,
+        "urgent": false,
+        "store": null,
+        "is_food": false,
+        "name": "sponges"
+      }
+    },
+    {
+      "id": "V18",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "no-split"
+      ],
+      "input": "half-and-half",
+      "expect": {
+        "quantity": null,
+        "unit": null,
+        "urgent": false,
+        "store": null,
+        "is_food": true,
+        "name": "half-and-half"
+      }
+    },
+    {
+      "id": "V19",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "own-suffix"
+      ],
+      "input": "bread (small)",
+      "expect": {
+        "quantity": null,
+        "unit": null,
+        "urgent": false,
+        "store": null,
+        "is_food": true,
+        "name": "bread"
+      }
+    }
+  ]
+}
