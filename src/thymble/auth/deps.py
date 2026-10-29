@@ -8,10 +8,11 @@ everywhere (architecture §12).
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -91,3 +92,38 @@ def require_member(
     if role is HouseholdRole.OWNER and membership.role is not HouseholdRole.OWNER:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "only household owners can do that")
     return membership
+
+
+HOUSEHOLD_HEADER = "X-Thymble-Household"
+
+
+@dataclass(frozen=True)
+class CurrentHousehold:
+    """The household a request acts on, and the signed-in member acting on it."""
+
+    household_id: uuid.UUID
+    user_id: uuid.UUID
+    role: HouseholdRole
+
+
+def get_current_household(
+    user: CurrentUser,
+    db: DbSession,
+    x_thymble_household: Annotated[
+        str | None, Header(description="Household the request acts on (UUID)")
+    ] = None,
+) -> CurrentHousehold:
+    """The household named in `X-Thymble-Household`, after checking the user belongs to it."""
+    if not x_thymble_household:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{HOUSEHOLD_HEADER} header required")
+    try:
+        household_id = uuid.UUID(x_thymble_household)
+    except ValueError as exc:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, f"{HOUSEHOLD_HEADER} must be a UUID"
+        ) from exc
+    membership = require_member(db, user, household_id)
+    return CurrentHousehold(household_id, user.id, membership.role)
+
+
+CurrentHouseholdDep = Annotated[CurrentHousehold, Depends(get_current_household)]

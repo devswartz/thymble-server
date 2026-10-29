@@ -5,28 +5,36 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-from tests.conftest import make_settings
-from thymble.api.deps import CurrentHousehold, get_current_household, get_db
+from tests.accounts import Member, authed_settings, create_member
 from thymble.connectors.crypto import decrypt_credentials
+from thymble.db.deps import get_db
 from thymble.main import create_app
-from thymble.models import ConnectorAccount, Household
+from thymble.models import ConnectorAccount
 
 pytestmark = pytest.mark.db
 
 SETTINGS = dict(connectors_lists=["home_assistant"], connector_encryption_key="test-key-123")
 
 
-@pytest.fixture
-def api(sessions, household):
-    app = create_app(make_settings(**SETTINGS))
+def make_client(sessions, member: Member | None = None, **settings) -> TestClient:
+    app = create_app(authed_settings(**settings))
 
     def db():
         with sessions() as s:
             yield s
 
     app.dependency_overrides[get_db] = db
-    app.dependency_overrides[get_current_household] = lambda: CurrentHousehold(household)
-    return TestClient(app)
+    return TestClient(app, headers=member.headers if member else None)
+
+
+@pytest.fixture
+def member(sessions, household) -> Member:
+    return create_member(sessions, authed_settings(), household_id=household)
+
+
+@pytest.fixture
+def api(sessions, member):
+    return make_client(sessions, member, **SETTINGS)
 
 
 def ok(response, code=200):
@@ -34,12 +42,19 @@ def ok(response, code=200):
     return response.json() if response.content else None
 
 
-def test_unauthenticated_requests_are_rejected(sessions):
-    client = TestClient(create_app(make_settings()))
-    assert client.get("/v1/shopping/lists").status_code == 401
-    # The dev-only header stand-in is off outside development.
-    hdr = {"X-Thymble-Household": str(uuid.uuid4())}
-    assert client.get("/v1/shopping/lists", headers=hdr).status_code == 401
+def test_unauthenticated_requests_are_rejected(sessions, member):
+    for env_name in ("production", "development"):
+        client = make_client(sessions, thymble_env=env_name)
+        assert client.get("/v1/shopping/lists").status_code == 401
+        # Naming a household without a token is not enough, in any environment.
+        hdr = {"X-Thymble-Household": str(member.household_id)}
+        assert client.get("/v1/shopping/lists", headers=hdr).status_code == 401
+    # A token without a household is a bad request; a household the user isn't in is 404.
+    client = make_client(sessions)
+    token_only = {"Authorization": member.headers["Authorization"]}
+    assert client.get("/v1/shopping/lists", headers=token_only).status_code == 400
+    stranger = member.headers_for(uuid.uuid4())
+    assert client.get("/v1/stores", headers=stranger).status_code == 404
 
 
 def test_list_item_flow(api):
@@ -98,17 +113,15 @@ def test_errors_are_mapped(api):
     assert api.get(f"/v1/shopping/items/{uuid.uuid4()}").status_code == 404
 
 
-def test_other_households_data_is_invisible(api, sessions):
-    with sessions() as s:
-        other = Household(name="Other")
-        s.add(other)
-        s.commit()
-        other_id = other.id
+def test_other_households_data_is_invisible(api, sessions, member):
+    other = create_member(sessions, authed_settings(), name="Other cook")
     lst = ok(api.post("/v1/shopping/lists", json={"name": "Mine"}), 201)
-    app = api.app
-    app.dependency_overrides[get_current_household] = lambda: CurrentHousehold(other_id)
-    assert api.get(f"/v1/shopping/lists/{lst['id']}/items").status_code == 404
-    assert ok(api.get("/v1/shopping/lists")) == []
+    them = make_client(sessions, other, **SETTINGS)
+    assert them.get(f"/v1/shopping/lists/{lst['id']}/items").status_code == 404
+    assert ok(them.get("/v1/shopping/lists")) == []
+    # Naming our household with their token doesn't help.
+    hdr = other.headers_for(member.household_id)
+    assert them.get("/v1/shopping/lists", headers=hdr).status_code == 404
 
 
 def test_trip_endpoints(api):
@@ -154,7 +167,7 @@ def test_connector_accounts_never_return_credentials(api, sessions):
     with sessions() as s:
         account = s.get(ConnectorAccount, uuid.UUID(created["id"]))
         assert b"secret-long-lived-token" not in account.credentials_encrypted
-        creds = decrypt_credentials(make_settings(**SETTINGS), account.credentials_encrypted)
+        creds = decrypt_credentials(authed_settings(**SETTINGS), account.credentials_encrypted)
         assert creds == {"token": "secret-long-lived-token"}
 
     costco = ok(api.post("/v1/stores", json={
@@ -174,16 +187,9 @@ def test_connector_accounts_never_return_credentials(api, sessions):
     assert ok(api.get("/v1/stores"))[0]["external_list_id"] is None
 
 
-def test_connector_needs_encryption_key(sessions, household):
-    app = create_app(make_settings(connectors_lists=["home_assistant"]))
-    app.dependency_overrides[get_current_household] = lambda: CurrentHousehold(household)
-
-    def db():
-        with sessions() as s:
-            yield s
-
-    app.dependency_overrides[get_db] = db
-    r = TestClient(app).post("/v1/connectors", json={
+def test_connector_needs_encryption_key(sessions, member):
+    client = make_client(sessions, member, connectors_lists=["home_assistant"])
+    r = client.post("/v1/connectors", json={
         "kind": "home_assistant", "base_url": "http://ha:8123", "token": "t",
         "config": {"main_entity": "todo.x"}})  # fmt: skip
     assert r.status_code == 503

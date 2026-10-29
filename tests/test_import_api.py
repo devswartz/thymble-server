@@ -18,10 +18,11 @@ from sqlalchemy import create_engine, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
-from tests.conftest import make_settings
+from tests.accounts import Member, authed_settings, create_member
 from tests.llm_fakes import FakeProvider
-from thymble.api.imports import get_db, get_enqueue
+from thymble.api.imports import get_enqueue
 from thymble.config import normalize_db_url
+from thymble.db.deps import get_db
 from thymble.importer.jobs import import_recipe
 from thymble.llm import DbStore, LLMClient
 from thymble.main import create_app
@@ -89,7 +90,7 @@ def llm_reply(request):
 @pytest.fixture
 def env(sm):
     provider = FakeProvider("anthropic", llm_reply)
-    settings = make_settings(thymble_env="development", anthropic_api_key="sk-test-placeholder")
+    settings = authed_settings(anthropic_api_key="sk-test-placeholder")
     llm = LLMClient(settings, providers={"anthropic": provider}, store=DbStore(sm))
     app = create_app(settings)
 
@@ -106,30 +107,25 @@ def env(sm):
 
 
 @pytest.fixture
-def household(sm) -> uuid.UUID:
-    from thymble.models import Household
-
-    with sm() as session:
-        hh = Household(name="Test household")
-        session.add(hh)
-        session.commit()
-        return hh.id
+def member(sm) -> Member:
+    return create_member(sm, authed_settings())
 
 
-def headers(household_id: uuid.UUID) -> dict[str, str]:
-    return {"X-Household-Id": str(household_id)}
+@pytest.fixture
+def household(member) -> uuid.UUID:
+    return member.household_id
 
 
-def post_page(client: TestClient, household_id: uuid.UUID, name: str = "jsonld_graph.html"):
+def post_page(client: TestClient, member: Member, name: str = "jsonld_graph.html"):
     html = (FIXTURES / name).read_text(encoding="utf-8")
     return client.post(
         "/v1/imports",
         json={"html": html, "final_url": "https://example.test/lentil-soup"},
-        headers=headers(household_id),
+        headers=member.headers,
     )
 
 
-def test_device_html_import_saves_a_draft_recipe(env, household, sm):
+def test_device_html_import_saves_a_draft_recipe(env, member, household, sm):
     from thymble.models import (
         ImportJob,
         Ingredient,
@@ -143,11 +139,11 @@ def test_device_html_import_saves_a_draft_recipe(env, household, sm):
     )
 
     client, provider = env
-    response = post_page(client, household)
+    response = post_page(client, member)
     assert response.status_code == 202, response.text
     job_id = response.json()["id"]
 
-    status = client.get(f"/v1/imports/{job_id}", headers=headers(household)).json()
+    status = client.get(f"/v1/imports/{job_id}", headers=member.headers).json()
     assert status["status"] == "done", status
     assert status["final_url"] == "https://example.test/lentil-soup"
     assert status["result"]["title"] == "Weeknight Lentil Soup"
@@ -194,25 +190,31 @@ def test_device_html_import_saves_a_draft_recipe(env, household, sm):
 
     # Second import: aliases come from the database, the T3 answer from llm_cache.
     calls_before = len(provider.requests)
-    assert post_page(client, household).status_code == 202
+    assert post_page(client, member).status_code == 202
     assert len(provider.requests) == calls_before
 
 
-def test_imports_are_private_to_the_household(env, household, sm):
-    from thymble.models import Household
-
+def test_imports_are_private_to_the_household(env, member, sm):
     client, _ = env
-    job_id = post_page(client, household).json()["id"]
-    with sm() as session:
-        other = Household(name="Other")
-        session.add(other)
-        session.commit()
-    assert client.get(f"/v1/imports/{job_id}", headers=headers(other.id)).status_code == 404
-    assert client.get(f"/v1/imports/{job_id}").status_code == 401
+    job_id = post_page(client, member).json()["id"]
+    url = f"/v1/imports/{job_id}"
+    other = create_member(sm, authed_settings(), name="Other cook")
+    # A member of another household can't see it, in their household or by naming ours.
+    assert client.get(url, headers=other.headers).status_code == 404
+    assert client.get(url, headers=other.headers_for(member.household_id)).status_code == 404
+    # A second member of the same household can.
+    housemate = create_member(sm, authed_settings(), household_id=member.household_id)
+    assert client.get(url, headers=housemate.headers).status_code == 200
+    # No token, a bad token, or no household named: refused.
+    assert client.get(url).status_code == 401
+    bad = {**member.headers, "Authorization": "Bearer not-a-token"}
+    assert client.get(url, headers=bad).status_code == 401
+    no_household = {"Authorization": member.headers["Authorization"]}
+    assert client.get(url, headers=no_household).status_code == 400
 
 
-def test_failed_import_reports_the_reason(sm, household):
-    settings = make_settings(thymble_env="development")
+def test_failed_import_reports_the_reason(sm, member):
+    settings = authed_settings()
     app = create_app(settings)
     llm = LLMClient(settings, providers={}, store=DbStore(sm))
 
@@ -226,23 +228,23 @@ def test_failed_import_reports_the_reason(sm, household):
     app.dependency_overrides[get_db] = db
     app.dependency_overrides[get_enqueue] = lambda: enqueue
     client = TestClient(app)
-    job_id = post_page(client, household, "no_markup.html").json()["id"]
-    status = client.get(f"/v1/imports/{job_id}", headers=headers(household)).json()
+    job_id = post_page(client, member, "no_markup.html").json()["id"]
+    status = client.get(f"/v1/imports/{job_id}", headers=member.headers).json()
     assert status["status"] == "failed"
     assert "no recipe found" in status["error"] and status["recipe_id"] is None
 
 
-def test_photo_import_multipart(env, household, sm):
+def test_photo_import_multipart(env, member, sm):
     from thymble.models import ImportJob
 
     client, _ = env
     response = client.post(
         "/v1/imports",
         files={"photo": ("card.jpg", b"\xff\xd8fake-jpeg", "image/jpeg")},
-        headers=headers(household),
+        headers=member.headers,
     )
     assert response.status_code == 202, response.text
-    status = client.get(f"/v1/imports/{response.json()['id']}", headers=headers(household)).json()
+    status = client.get(f"/v1/imports/{response.json()['id']}", headers=member.headers).json()
     assert status["status"] == "done", status
     assert status["source_kind"] == "photo"
     assert status["result"]["transcription"][0] == "Tea"
@@ -252,7 +254,7 @@ def test_photo_import_multipart(env, household, sm):
     bad = client.post(
         "/v1/imports",
         files={"photo": ("doc.pdf", b"%PDF", "application/pdf")},
-        headers=headers(household),
+        headers=member.headers,
     )
     assert bad.status_code == 415
 
@@ -266,12 +268,13 @@ def test_photo_import_multipart(env, household, sm):
         {},
     ],
 )
-def test_request_validation(env, household, body):
+def test_request_validation(env, member, body):
     client, _ = env
-    response = client.post("/v1/imports", json=body, headers=headers(household))
+    response = client.post("/v1/imports", json=body, headers=member.headers)
     assert response.status_code == 422
 
 
-def test_production_refuses_until_sign_in_exists():
-    client = TestClient(create_app(make_settings(thymble_env="production")))
-    assert client.post("/v1/imports", json={"text": "x"}).status_code == 501
+def test_imports_need_sign_in_in_every_environment():
+    for env_name in ("production", "development"):
+        client = TestClient(create_app(authed_settings(thymble_env=env_name)))
+        assert client.post("/v1/imports", json={"text": "x"}).status_code == 401

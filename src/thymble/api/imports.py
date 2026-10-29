@@ -6,34 +6,31 @@ POST /v1/imports      start an import; returns 202 with the job id
     JSON {"text": "..."}                      pasted recipe text
     multipart form, field "photo"             photo of a recipe card or cookbook page
 GET  /v1/imports/{id} status and result (the draft recipe id once done)
+
+Both need a bearer token and the household in X-Thymble-Household (thymble.auth.deps).
 """
 
 from __future__ import annotations
 
 import uuid
-from collections.abc import Awaitable, Callable, Iterator
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 from sqlalchemy.orm import Session
 
+from thymble.auth.deps import CurrentHouseholdDep
 from thymble.config import Settings, get_settings
+from thymble.db.deps import get_db
 from thymble.importer.jobs import JOB_NAME
 from thymble.importer.pipeline import PHOTO_TYPES
 
 router = APIRouter(tags=["imports"])
 
 Enqueue = Callable[[str], Awaitable[None]]
-
-
-def get_db() -> Iterator[Session]:
-    from thymble.db.session import get_sessionmaker
-
-    with get_sessionmaker()() as session:
-        yield session
 
 
 def get_enqueue(settings: Annotated[Settings, Depends(get_settings)]) -> Enqueue:
@@ -48,24 +45,6 @@ def get_enqueue(settings: Annotated[Settings, Depends(get_settings)]) -> Enqueue
             await pool.aclose()
 
     return enqueue
-
-
-def get_household_id(
-    settings: Annotated[Settings, Depends(get_settings)],
-    db: Annotated[Session, Depends(get_db)],
-    x_household_id: Annotated[uuid.UUID | None, Header()] = None,
-) -> uuid.UUID:
-    """Placeholder until sign-in lands (architecture §9): outside production the household
-    comes from the X-Household-Id header; production refuses imports rather than guessing."""
-    from thymble.models import Household
-
-    if settings.thymble_env == "production":
-        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "sign-in is not available yet")
-    if x_household_id is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "X-Household-Id header required")
-    if db.get(Household, x_household_id) is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "household not found")
-    return x_household_id
 
 
 class ImportRequest(BaseModel):
@@ -146,13 +125,13 @@ async def create_import(
     request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
     db: Annotated[Session, Depends(get_db)],
-    household_id: Annotated[uuid.UUID, Depends(get_household_id)],
+    hh: CurrentHouseholdDep,
     enqueue: Annotated[Enqueue, Depends(get_enqueue)],
 ) -> ImportStatusOut:
     from thymble.models import ImportJob, ImportSourceKind, ImportStatus
 
     content_type = request.headers.get("content-type", "")
-    job = ImportJob(household_id=household_id, status=ImportStatus.QUEUED)
+    job = ImportJob(household_id=hh.household_id, status=ImportStatus.QUEUED)
     if content_type.startswith("multipart/form-data"):
         if not (settings.llm_providers and settings.photo_import_enabled):
             raise HTTPException(status.HTTP_409_CONFLICT, "photo import is not available")
@@ -198,11 +177,11 @@ async def create_import(
 def get_import(
     import_id: uuid.UUID,
     db: Annotated[Session, Depends(get_db)],
-    household_id: Annotated[uuid.UUID, Depends(get_household_id)],
+    hh: CurrentHouseholdDep,
 ) -> ImportStatusOut:
     from thymble.models import ImportJob
 
     job = db.get(ImportJob, import_id)
-    if job is None or job.household_id != household_id:
+    if job is None or job.household_id != hh.household_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "import not found")
     return _out(job)
