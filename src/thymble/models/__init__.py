@@ -9,11 +9,13 @@ from thymble.models.imports import ImportJob, ImportSourceKind, ImportStatus, Ll
 from thymble.models.learning import LearningEvent, LlmCache
 from thymble.models.planning import MealPlanEntry, MealSlot
 from thymble.models.recipes import (
+    ImportConfidence,
     Recipe,
     RecipeIngredient,
     RecipeSourceType,
     RecipeStep,
     RecipeTag,
+    ReviewState,
     Tag,
 )
 from thymble.models.shopping import (
@@ -38,6 +40,7 @@ __all__ = [
     "HouseholdInvite",
     "HouseholdMember",
     "HouseholdRole",
+    "ImportConfidence",
     "ImportJob",
     "ImportSourceKind",
     "ImportStatus",
@@ -57,6 +60,7 @@ __all__ = [
     "RecipeStep",
     "RecipeTag",
     "RefreshToken",
+    "ReviewState",
     "ShoppingItem",
     "ShoppingItemSource",
     "ShoppingList",
