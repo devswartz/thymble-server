@@ -19,8 +19,9 @@ from functools import lru_cache
 from typing import Any
 
 from thymble.importer import rules
+from thymble.importer.thresholds import PARSER_CHECK_BELOW
 
-CONFIDENCE_THRESHOLD = 0.90
+CONFIDENCE_THRESHOLD = PARSER_CHECK_BELOW
 
 BRANDS = ["Diamond Crystal", "Morton", "King Arthur Unbleached", "King Arthur", "Bob's Red Mill"]
 _AMOUNT = (
@@ -44,7 +45,8 @@ class ParsedLine:
     preparation: str | None = None
     note: str | None = None
     optional: bool = False
-    confidence: float = 0.0
+    # Lowest field confidence from ingredient-parser-nlp (1.0 for ditto copies).
+    parser_confidence: float = 0.0
     flags: list[str] = field(default_factory=list)
     ditto: bool = False
     group: str | None = None
@@ -53,6 +55,16 @@ class ParsedLine:
     review_reasons: list[str] = field(default_factory=list)
     ingredient_id: str | None = None
     ingredient_name: str | None = None
+    # How the catalog link was made: alias | catalog | dictionary | llm | new (None: not run).
+    resolved_by: str | None = None
+    # Canonical name the LLM mapped this line to (resolved_by == "llm").
+    ingredient_label: str | None = None
+    # Review confidence (D-034): high | check | low, with plain-language reasons and codes.
+    confidence: str = "high"
+    reasons: list[str] = field(default_factory=list)
+    reason_codes: list[str] = field(default_factory=list)
+    # Photo imports: this line in both readings (D-035).
+    readings: dict[str, Any] | None = None
 
     @property
     def route_to_llm(self) -> bool:
@@ -135,7 +147,7 @@ def _from_ditto(text: str, lang: str, prev: ParsedLine, group: str | None) -> Pa
         return None
     out = ParsedLine(**{**asdict(prev), "raw_text": text, "text": text, "group": group})
     out.additional, out.alternatives = list(prev.additional), list(prev.alternatives)
-    out.ditto, out.confidence, out.flags, out.review_reasons = True, 1.0, [], []
+    out.ditto, out.parser_confidence, out.flags, out.review_reasons = True, 1.0, [], []
     out.source, out.ingredient_id, out.ingredient_name = "rules", None, None
     if kind == "qty":
         amount = parse_line(f"{arg} x", lang)
@@ -284,7 +296,7 @@ def parse_line(
         preparation=prep,
         note="; ".join(notes) or None,
         optional=bool(re.search(r"\boptional\b", low)),
-        confidence=round(confidence, 4),
+        parser_confidence=round(confidence, 4),
         flags=flags,
         group=group,
     )

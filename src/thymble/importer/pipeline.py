@@ -6,6 +6,9 @@ Stages are separate functions so each can be retried and improved on its own:
   lines     rules + ingredient-parser-nlp; LLM (T3) for low-confidence, "or"/"sub", non-English
   normalize compound dictionary + catalog aliases; LLM (T4) for unseen names
   steps     section-heading detection + timers
+  review    confidence (high / check / low) with reasons for every line, step and section,
+            from evidence only (D-034); photos are checked against the device's own OCR
+            reading line by line (D-035)
 The outcome is saved as a draft recipe for the user to review (§5.8); anything the pipeline
 could not settle is listed in `review_reasons` rather than failing the import.
 """
@@ -16,10 +19,9 @@ import logging
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Protocol
-from urllib.parse import urlsplit
 
 from thymble.config import Settings
-from thymble.importer import llm_tasks, rules
+from thymble.importer import confidence, llm_tasks, readings, rules
 from thymble.importer.extract import (
     RecipeDraft,
     extract_from_html,
@@ -53,6 +55,10 @@ class ImportInput:
     text: str | None = None
     photo: bytes | None = None
     photo_mime: str | None = None
+    # Photos: the device's own OCR of the same photo (D-035) and, optionally, its
+    # confidence per line of that text (0..1, one per line including blank ones).
+    device_ocr_text: str | None = None
+    device_ocr_confidences: list[float] | None = None
 
 
 @dataclass
@@ -66,10 +72,14 @@ class ImportOutcome:
     review_reasons: list[str] = field(default_factory=list)
     stages: list[str] = field(default_factory=list)
     transcription: list[str] | None = None
+    readings: readings.Readings | None = None
+    sections: dict[str, dict[str, Any]] = field(default_factory=dict)
+    review_state: str = "needs_review"
+    confidence_counts: dict[str, int] = field(default_factory=dict)
 
     @property
     def needs_review(self) -> bool:
-        return bool(self.review_reasons) or any(line.needs_review for line in self.lines)
+        return self.review_state == "needs_review"
 
     def to_result(self) -> dict[str, Any]:
         d = self.draft
@@ -96,9 +106,15 @@ class ImportOutcome:
             "ingredients": [line.to_dict() for line in self.lines],
             "steps": self.steps,
             "transcription": self.transcription,
+            "readings": self.readings.to_dict() if self.readings else None,
             "stages": self.stages,
             "needs_review": self.needs_review,
             "review_reasons": self.review_reasons,
+            "review": {
+                "state": self.review_state,
+                "counts": self.confidence_counts,
+                "sections": self.sections,
+            },
         }
 
 
@@ -121,9 +137,11 @@ class ImportPipeline:
         reasons: list[str] = []
         stages: list[str] = []
         transcription: list[str] | None = None
+        resolved: list[str] | None = None
+        self._notes: list[tuple[str, str | None]] = []
         final_url = item.final_url
         if item.kind == "photo":
-            draft, transcription = await self._from_photo(item, reasons, stages)
+            draft, transcription, resolved = await self._from_photo(item, reasons, stages)
         elif item.kind == "text":
             draft = await self._from_text(item.text or "", reasons, stages)
         else:
@@ -132,7 +150,7 @@ class ImportPipeline:
                 page = await self._fetch(item.url or "")
                 html, final_url = page.html, page.final_url
                 stages.append("fetch")
-                if _different_page(item.url, final_url):
+                if confidence.different_page(item.url, final_url):
                     reasons.append("the link redirected to a different page; check the title")
             draft = await self._from_html(html or "", final_url, reasons, stages)
         draft.source_url = final_url
@@ -150,10 +168,13 @@ class ImportPipeline:
             await self.resolver.resolve(lines)
             stages.append("normalize")
 
+        split = rules.split_steps(draft.steps)
         steps = [
             {"text": text, "group": group, "timers": rules.detect_timers(text) or None}
-            for text, group in rules.split_steps(draft.steps)
+            for text, group in split
         ]
+        # Groups that came from headings the page returned as steps (a rule that can misfire).
+        heading_groups = {g for _, g in split if g} - {g for _, g in draft.steps if g}
         yield_info = rules.parse_yield(draft.yield_raw)
         for attr in ("prep_time", "cook_time", "total_time"):
             if getattr(draft, f"{attr}_minutes") is None:
@@ -164,6 +185,30 @@ class ImportPipeline:
             reasons.append("no title found")
         if not steps:
             reasons.append("no steps found")
+
+        second: readings.Readings | None = None
+        if item.kind == "photo" and transcription is not None and item.device_ocr_text:
+            device, scores = readings.split_device_text(
+                item.device_ocr_text, item.device_ocr_confidences
+            )
+            if device:
+                second = readings.align(transcription, device, scores)
+                stages.append("compare-readings")
+        report = confidence.assess_import(
+            kind=item.kind,
+            draft=draft,
+            lines=lines,
+            steps=steps,
+            yield_info=yield_info,
+            requested_url=item.url,
+            final_url=final_url,
+            heading_groups=heading_groups,
+            transcription=transcription,
+            resolved_transcription=resolved,
+            readings=second,
+            notes=self._notes,
+        )
+        stages.append("confidence")
         return ImportOutcome(
             draft=draft,
             lines=lines,
@@ -174,6 +219,10 @@ class ImportPipeline:
             review_reasons=reasons,
             stages=stages,
             transcription=transcription,
+            readings=second,
+            sections=report.sections,
+            review_state=report.review_state,
+            confidence_counts=report.counts,
         )
 
     # ------------------------------------------------------------------ acquire + extract
@@ -207,6 +256,7 @@ class ImportPipeline:
         if llm_draft is None:
             if draft is not None and draft.ingredients:
                 reasons.append(f"the page's recipe data is incomplete ({_reason(result)})")
+                self._notes.append(("partial_data", _reason(result)))
                 return draft
             raise ImportFailed(f"no recipe found on this page ({_reason(result)})")
         reasons.append("extracted by AI from the page text; please check it")
@@ -237,7 +287,7 @@ class ImportPipeline:
 
     async def _from_photo(
         self, item: ImportInput, reasons: list[str], stages: list[str]
-    ) -> tuple[RecipeDraft, list[str]]:
+    ) -> tuple[RecipeDraft, list[str], list[str]]:
         if not item.photo or item.photo_mime not in PHOTO_TYPES:
             raise ImportFailed("the photo must be a JPEG, PNG, WebP or GIF image")
         image = ImageInput(item.photo, item.photo_mime)
@@ -260,7 +310,7 @@ class ImportPipeline:
             if draft is None:
                 raise ImportFailed(f"could not find a recipe in the photo ({_reason(structured)})")
         reasons.append("read from a photo; please check it against the original")
-        return draft, lines
+        return draft, lines, resolved
 
     # ------------------------------------------------------------------ lines
 
@@ -283,17 +333,6 @@ def _reason(result: Any) -> str:
     return getattr(result, "reason", None) or "the AI could not structure it"
 
 
-def _different_page(requested: str | None, final: str | None) -> bool:
-    if not requested or not final:
-        return False
-    a, b = urlsplit(requested), urlsplit(final)
-
-    def host(name: str | None) -> str:
-        return (name or "").lower().removeprefix("www.")
-
-    return host(a.hostname) != host(b.hostname) or a.path.rstrip("/") != b.path.rstrip("/")
-
-
 def _expand_additional(lines: list[ParsedLine]) -> list[ParsedLine]:
     """ "salt and pepper" -> two lines (same raw_text), so both reach the shopping list."""
     out: list[ParsedLine] = []
@@ -311,7 +350,7 @@ def _expand_additional(lines: list[ParsedLine]) -> list[ParsedLine]:
                     name=name,
                     note=line.note,
                     optional=line.optional,
-                    confidence=line.confidence,
+                    parser_confidence=line.parser_confidence,
                     group=line.group,
                     source=line.source,
                 )

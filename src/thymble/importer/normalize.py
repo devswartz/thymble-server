@@ -173,23 +173,28 @@ class IngredientResolver:
         self.user_id = user_id
 
     async def resolve(self, lines: list[ParsedLine]) -> None:
-        cache: dict[str, uuid.UUID | None] = {}
+        """Set `ingredient_id` on each line, and `resolved_by` (alias/catalog, dictionary,
+        llm or new) so import review can flag names the catalog didn't know (D-034)."""
+        cache: dict[str, tuple[uuid.UUID | None, str, str | None]] = {}
         for line in lines:
             if not line.ingredient_name:
                 continue
             key = line.ingredient_name
             if key not in cache:
                 cache[key] = await self._resolve_name(key, line.name or key)
-            ingredient_id = cache[key]
+            ingredient_id, how, label = cache[key]
             line.ingredient_id = str(ingredient_id) if ingredient_id else None
+            line.resolved_by, line.ingredient_label = how, label
 
-    async def _resolve_name(self, key: str, display: str) -> uuid.UUID | None:
+    async def _resolve_name(
+        self, key: str, display: str
+    ) -> tuple[uuid.UUID | None, str, str | None]:
         found = await asyncio.to_thread(self._lookup, key)
         if found is not None:
-            return found
+            return found, "catalog", None
         compound = lookup_compound(key)
         if compound is not None:
-            return await asyncio.to_thread(self._global_ingredient, compound)
+            return await asyncio.to_thread(self._global_ingredient, compound), "dictionary", None
         result = await self._llm.run(
             Task.T4,
             system=T4_SYSTEM,
@@ -198,8 +203,9 @@ class IngredientResolver:
             household_id=self.household_id,
         )
         if not result.ok or result.data is None:
-            return await asyncio.to_thread(self._household_ingredient, key)
-        return await asyncio.to_thread(self._learn, key, result.data, result.provider)
+            return await asyncio.to_thread(self._household_ingredient, key), "new", None
+        learned = await asyncio.to_thread(self._learn, key, result.data, result.provider)
+        return learned, "llm", result.data["canonical_name"].strip().lower()
 
     # ---- database (sync, run in a thread)
 

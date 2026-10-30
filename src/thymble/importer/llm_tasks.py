@@ -80,7 +80,9 @@ T2_TRANSCRIBE_SYSTEM = (
     "You transcribe a photo of a recipe (a card, a cookbook page, a handwritten note). Write "
     "out every line of text exactly as it appears, in reading order. Do not interpret, "
     "correct, convert, complete or reorder anything. Keep ditto marks such as 'do.', '\"' "
-    "or 'same as above' exactly as written. " + DATA_NOTE
+    "or 'same as above' exactly as written. Write [?] in place of a word you cannot read "
+    "and [cut] where text runs off the edge of the photo; never guess a missing word or "
+    "number. " + DATA_NOTE
 )
 T2_STRUCTURE_SYSTEM = (
     "You turn the transcribed text of a recipe into structured data. Copy the title, "
@@ -133,7 +135,7 @@ async def transcribe_photo(llm: LLMClient, image: ImageInput, household_id: Any)
         output=Transcription,
         images=[image],
         household_id=household_id,
-        schema_version="transcribe-1",
+        schema_version="transcribe-2",
     )
 
 
