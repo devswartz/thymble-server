@@ -50,7 +50,7 @@ UTF-8 JSON, LF line endings:
 |---|---|---|
 | `quantity` | number or null | First amount on the line. Word numbers resolved ("a dozen" = 12, "half a" = 0.5, "a couple of" = 2, "a pinch" = 1). Simple arithmetic resolved ("2 cups minus 2 tablespoons" = 1.875 cup). |
 | `quantity_max` | number or null | Upper end of a range ("2-3", "1 to 2", "4–6"); null otherwise. |
-| `unit` | string or null | Canonical code: `cup`, `tbsp`, `tsp`, `lb`, `oz`, `g`, `kg`, `ml`, `l`, `can` (also "tin"), `clove`, `pinch`, ... (see `UNIT_ALIASES` in `src/thymble/importer/rules.py`). Capital `T` = tbsp, small `t` = tsp. |
+| `unit` | string or null | Canonical unit code (below). Capital `T` = tbsp, small `t` = tsp. |
 | `name` | string | The thing you buy, compound names kept whole ("all-purpose flour"). Brand names of the same product are dropped. |
 | `additional` | list of strings | Extra **separate shopping items**: "and", "&", "and/or", "EACH x and y". |
 | `alternatives` | list of strings | Substitutes for the **same item**: "or", "sub", "(or X)". |
@@ -62,6 +62,34 @@ UTF-8 JSON, LF line endings:
 make one item with substitutes; "or" between two names or brands of the same product
 ("Diamond Crystal or Morton kosher salt", "cornflour / cornstarch") is one item with no
 substitutes; "or as needed" and "half-and-half" are never split.
+
+### Unit codes
+
+Recipe lines and voice items use the same codes; the server's one table is
+`src/thymble/units.py` (`UNITS`, with every accepted spelling in `ALIASES`). The codes
+are the importer's (and ThymbleKit's): lower-case ASCII, and `fl oz` is the one code with
+a space. Underscores read as spaces (the parser's `fluid_ounce` = `fl oz`).
+
+| kind | codes |
+|---|---|
+| volume | `ml`, `cl`, `dl`, `l`, `tsp`, `tbsp`, `fl oz`, `cup`, `pt`, `qt`, `gal` |
+| mass | `mg`, `g`, `kg`, `oz` (weight ounce), `lb` |
+| length | `cm`, `inch` |
+| count | `piece` ("each", "ct", "pc"; left out of display text: "6 eggs") |
+| other | `can` (also "tin"), `clove`, `stick`, `sheet`, `pinch`, `dash`, `bunch`, `package` (also "pack", "packet", "pkg"), `slice`, `sprig`, `drop`, `jar`, `handful`, `head`, `stalk`, `bag`, `bottle`, `box` |
+
+Plurals of any spelling map to the same code ("fluid ounces" = `fl oz`, "packs" =
+`package`). A unit not in the table comes back lower-case and singular.
+
+Settled differences (U09-U14, V20-V22): "packs" is `package` on both sides (the server's
+voice parser used to say `pack`); "piece" / "pieces" is `piece` on both sides (the
+shopping list used to say `ct`); pints `pt` and quarts `qt` everywhere (the shopping list
+used to say `pint` / `quart`).
+
+### Apostrophes
+
+Curly apostrophes (U+2019, U+2018, U+02BC) read as a straight `'` in voice items before any
+rule runs, so "we’re out of milk" is urgent like "we're out of milk" (V23).
 
 ### `voice_item` fields
 

@@ -23,7 +23,7 @@ from thymble.api.shopping_schemas import (
 from thymble.models import ConnectorAccount, ItemStorePref, Store, StoreGroup, StoreGroupMember
 from thymble.shopping.errors import NotFound, ShoppingError
 from thymble.shopping.service import ShoppingService, utcnow
-from thymble.shopping.units import normalize_unit
+from thymble.units import normalize as normalize_unit
 
 router = APIRouter(tags=["stores"])
 

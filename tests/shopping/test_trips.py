@@ -41,6 +41,27 @@ def test_in_store_sections(svc, setup, stocked):
     assert names(view.could_get_here) == ["birthday candles", "olive oil"]
 
 
+@pytest.mark.parametrize("kind", [TripKind.IN_STORE, TripKind.PICKUP])
+def test_at_the_bulk_store_the_bulk_item_is_needed_now(svc, setup, stocked, kind):
+    """D-029: shopping at Costco itself, the urgent bulk item is what to buy now; its
+    stop-gap is hidden, because buying the bulk item clears both."""
+    setup.costco.supports_pickup = True
+    trip = trips.create_trip(svc, setup.costco.id, kind)
+    view = trips.trip_view(svc, trip)
+    assert [i.id for i in view.needed_now] == [stocked["tp"].id]
+    assert names(view.get_here) == ["olive oil"]
+    shown = view.get_here + view.needed_now + view.could_get_here
+    assert stocked["tp gap"].id not in {i.id for i in shown}
+    assert stocked["tp gap"].id not in {i.id for i in trips.suggested_for_export(svc, trip)}
+
+    if kind == TripKind.IN_STORE:
+        trips.check_off(svc, trip, stocked["tp"])
+        assert stocked["tp gap"].status == ItemStatus.BOUGHT
+        # Elsewhere the stop-gap is gone and nothing is urgent any more.
+        other = trips.create_trip(svc, setup.walmart.id, TripKind.IN_STORE)
+        assert names(trips.trip_view(svc, other).needed_now) == []
+
+
 def test_in_store_check_off_is_bought_here(svc, setup, stocked):
     trip = trips.create_trip(svc, setup.aldi.id, TripKind.IN_STORE)
     trips.check_off(svc, trip, stocked["bananas"])

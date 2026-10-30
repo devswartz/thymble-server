@@ -17,7 +17,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
-from thymble.shopping.units import normalize_unit
+from thymble.units import normalize as normalize_unit
 
 # Suffix Thymble adds to stop-gap mirrors (design decision: "<name> (small)").
 STOPGAP_SUFFIX = " (small)"
@@ -34,7 +34,8 @@ _OUR_SUFFIX = re.compile(r"\s*(?:\(small\)|[—-]+\s*on .+ order)\s*$", re.I)
 _PACKAGING = r"packs?|bags?|boxes|box|cans?|bottles?|jars?|bunch(?:es)?|dozen|x"
 _UNIT_WORDS = (
     r"lbs?|pounds?|oz|ounces?|kg|kilos?|g|grams?|ml|l|liters?|litres?|gal(?:lons?)?|"
-    r"cups?|tbsps?|tsps?|tablespoons?|teaspoons?|qts?|quarts?|pints?|ct|count|" + _PACKAGING
+    r"cups?|tbsps?|tsps?|tablespoons?|teaspoons?|qts?|quarts?|pints?|ct|count|pieces?|pcs?|"
+    + _PACKAGING
 )
 _QTY = re.compile(
     rf"^(?P<q>\d+\s+\d+/\d+|\d+(?:[./]\d+)?)\s*(?P<u>(?:{_UNIT_WORDS})\b\.?)?\s+(?P<rest>.+)$",
@@ -127,11 +128,20 @@ def _strip_store(t: str, stores: Iterable[str]) -> tuple[str, str | None]:
     return t, None
 
 
+# Right / left single quotation mark and modifier letter apostrophe.
+_CURLY_APOSTROPHES = str.maketrans({"\u2019": "'", "\u2018": "'", "\u02bc": "'"})
+
+
+def straight_quotes(text: str) -> str:
+    """Curly apostrophes (iOS keyboards and dictation write "we\u2019re") read as straight."""
+    return text.translate(_CURLY_APOSTROPHES)
+
+
 def parse_entry(text: str, stores: Iterable[str] = ()) -> ParsedEntry:
     """Parse a spoken or typed list entry. `stores` adds the household's own store names
     to the chains recognised as store hints."""
-    stores = list(stores)
-    t = " ".join(text.strip().split())
+    stores = [straight_quotes(s) for s in stores]
+    t = " ".join(straight_quotes(text).strip().split())
     t = _OUR_SUFFIX.sub("", t)
     urgent = False
     store_hint = None

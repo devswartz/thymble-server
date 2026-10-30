@@ -19,6 +19,7 @@ from decimal import Decimal
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
+from thymble import units
 from thymble.models import (
     Ingredient,
     IngredientAlias,
@@ -35,7 +36,6 @@ from thymble.models import (
     Trip,
     Urgency,
 )
-from thymble.shopping import units
 from thymble.shopping.errors import NotFound, ShoppingError
 from thymble.shopping.text import STOPGAP_SUFFIX, name_key, name_variants
 
@@ -391,7 +391,7 @@ class ShoppingService:
         for item in self.session.scalars(q.order_by(ShoppingItem.created_at, ShoppingItem.id)):
             if ingredient_id is None and name_key(item.display_text) != name_key(name):
                 continue
-            if quantity is None or item.quantity is None or units.compatible(item.unit, unit):
+            if units.mergeable(item.quantity, item.unit, quantity, unit):
                 return item
         return None
 
@@ -447,7 +447,7 @@ class ShoppingService:
         name = " ".join(name.strip().split())
         if not name:
             raise ShoppingError("item name is empty")
-        unit = units.normalize_unit(unit)
+        unit = units.normalize(unit)
         quantity = Decimal(quantity) if quantity is not None else None
         if ingredient_id is None and resolve:
             ing = self.resolve_ingredient(name)
@@ -458,12 +458,9 @@ class ShoppingService:
 
         existing = self.find_open(list_id, ingredient_id, name, quantity, unit) if merge else None
         if existing is not None:
-            if quantity is not None:
-                if existing.quantity is None:
-                    existing.quantity, existing.unit = quantity, unit
-                else:
-                    extra = units.convert(quantity, unit, existing.unit)
-                    existing.quantity = (existing.quantity + (extra or 0)).quantize(units.QUANTUM)
+            existing.quantity, existing.unit = units.merge(
+                existing.quantity, existing.unit, quantity, unit
+            )
             if explicit:
                 existing.store_id, existing.store_group_id = store_id, store_group_id
             self._add_source(
@@ -552,7 +549,7 @@ class ShoppingService:
         if clear_quantity:
             item.quantity, item.unit = None, None
         elif quantity is not None:
-            item.quantity, item.unit = quantity, units.normalize_unit(unit)
+            item.quantity, item.unit = quantity, units.normalize(unit)
         if aisle is not None:
             item.aisle = aisle or None
         self._touch(item)
@@ -655,6 +652,12 @@ class ShoppingService:
         item.status = ItemStatus.BOUGHT
         item.checked_at = utcnow()
         item.checked_by = self.user_id
+        self._after_bought(item, store_id=store_id, trip_id=trip_id)
+        return item
+
+    def _after_bought(
+        self, item: ShoppingItem, *, store_id: uuid.UUID | None, trip_id: uuid.UUID | None
+    ) -> None:
         item.urgency = Urgency.NORMAL
         if trip_id is not None:
             item.trip_id = trip_id
@@ -669,17 +672,39 @@ class ShoppingService:
                 self.mark_bought(gap, trip_id=trip_id)
             if store_id is not None and item.ingredient_id is not None:
                 self._learn_checkoff(item, store_id, trip_id)
-        return item
 
     def mark_needed(self, item: ShoppingItem) -> ShoppingItem:
         if item.status == ItemStatus.NEEDED:
             return item
         item.status = ItemStatus.NEEDED
+        self._after_needed(item)
+        return item
+
+    def _after_needed(self, item: ShoppingItem) -> None:
         item.checked_at = None
         item.checked_by = None
         item.trip_id = None
         self._touch(item)
-        return item
+
+    def apply_client_change(self, item: ShoppingItem, changed: Iterable[str]) -> None:
+        """Apply the list rules to columns a device has already written (PowerSync upload).
+
+        REST calls `set_urgent`, `assign`, `mark_bought` and `mark_needed` directly; a
+        synced write lands here and runs the same code, so urgency (with its stop-gap),
+        re-assignment and check-offs behave the same whichever way they arrive.
+        """
+        changed = set(changed)
+        if "status" in changed and item.status == ItemStatus.BOUGHT:
+            if item.checked_at is None:
+                item.checked_at = utcnow()
+                item.checked_by = self.user_id
+            self._after_bought(item, store_id=None, trip_id=None)
+            return
+        if "status" in changed and item.status == ItemStatus.NEEDED:
+            self._after_needed(item)
+        assignment_changed = bool(changed & {"store_id", "store_group_id"})
+        if "urgency" in changed or (assignment_changed and item.urgency == Urgency.URGENT):
+            self.set_urgent(item, item.urgency == Urgency.URGENT)
 
     def delete_item(self, item: ShoppingItem) -> None:
         if item.deleted_at is not None:

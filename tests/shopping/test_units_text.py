@@ -3,7 +3,8 @@ from decimal import Decimal
 import pytest
 
 from thymble.shopping.text import name_key, parse_entry
-from thymble.shopping.units import compatible, convert, format_quantity, normalize_unit
+from thymble.units import compatible, convert, format_quantity
+from thymble.units import normalize as normalize_unit
 
 
 @pytest.mark.parametrize(

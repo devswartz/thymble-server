@@ -69,7 +69,7 @@ from thymble.models import (
 )
 from thymble.shopping.service import ShoppingService, utcnow
 from thymble.shopping.text import name_key, parse_entry
-from thymble.shopping.units import normalize_unit
+from thymble.units import normalize as normalize_unit
 
 log = logging.getLogger("thymble.connectors.home_assistant")
 

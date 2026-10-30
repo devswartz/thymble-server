@@ -9,7 +9,12 @@ DELETE for it:
 By default every column except the system columns (`id`, `household_id`, `created_at`,
 `updated_at`, `deleted_at`) is writable. Narrow it with `columns=` (allow-list) or
 `readonly=` (deny-list), and set server-owned values in `before_write` (raise
-`WriteRejected` there to refuse an entry).
+`WriteRejected` there to refuse an entry). When a delete has side effects (a bulk item's
+stop-gaps, a plan entry's share of the shopping list), `on_delete` replaces the plain soft
+delete; it must leave the row soft-deleted.
+
+Hooks are where sync meets the domain logic: call the same function the REST endpoint
+calls, so a change behaves the same whichever way it arrives.
 
 Every write is checked generically, whatever the table:
 - the row's household must be one the user belongs to; rows never move households;
@@ -48,6 +53,8 @@ class WriteRejected(Exception):
 
 # (context, row, op, inserting, changes) -> None. Runs after client values are applied.
 BeforeWrite = Callable[[WriteContext, Any, Op, bool, dict[str, Any]], None]
+# (context, row) -> None. Soft-deletes a live row along with whatever goes with that.
+OnDelete = Callable[[WriteContext, Any], None]
 
 
 @dataclass(frozen=True)
@@ -58,6 +65,7 @@ class SyncTable:
     # Columns clients may not write even though they'd otherwise be allowed.
     readonly: frozenset[str] = field(default_factory=frozenset)
     before_write: BeforeWrite | None = None
+    on_delete: OnDelete | None = None
 
     @property
     def name(self) -> str:
