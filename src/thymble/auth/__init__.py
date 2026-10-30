@@ -13,4 +13,5 @@ client_id, redirect_uri and PKCE challenge) and `POST /oauth/token` handling
 `grant_type=authorization_code` and `refresh_token`. Both can reuse
 `tokens.issue_token_pair(..., client_id="alexa")` and `tokens.rotate_refresh_token`:
 refresh tokens already record their `client_id`, and access tokens carry it as a claim.
+Full design: docs/oauth-account-linking.md.
 """

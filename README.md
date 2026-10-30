@@ -18,7 +18,7 @@ Planned: retailer connectors that send the list to grocery carts, and learning f
 Python / FastAPI · PostgreSQL · PowerSync (offline sync to the app) · Redis + arq (background jobs) · Docker Compose
 
 ## Self-hosting
-Thymble is designed to run on a home server. Docker Compose files and setup docs will land here as the server takes shape.
+Thymble is designed to run on a home server. [docs/self-hosting.md](docs/self-hosting.md) covers the production stack (`docker-compose.yml` + `docker-compose.prod.yml`: api, worker, PowerSync, Postgres, Redis, a Cloudflare Tunnel connector and nightly encrypted backups), configuration, restores and upgrades.
 
 ## Development
 
@@ -58,9 +58,17 @@ If a host port is already taken, set `THYMBLE_API_PORT`, `POWERSYNC_PORT`, `POST
 | `migrations/` | Alembic migrations (`0001` → `auth_0002` → `import_0001` → `shop_0001` → `plan_0001` and `import_0002` side by side → `merge_0001`). Create one with `docker compose exec api alembic revision --autogenerate -m "..."` |
 | `deploy/postgres/` | First-boot SQL for PowerSync: replication role, publication, storage database |
 | `deploy/powersync/` | PowerSync service config and sync config (what each device downloads, scoped by household) |
+| `deploy/backup/` | The backup image used by `docker-compose.prod.yml`: `thymble-backup` (nightly `pg_dump`, age, rclone) and `thymble-restore` |
+| `docker-compose.prod.yml` | Production overlay: no host ports, data under `/opt/thymble`, cloudflared, backups (see the self-hosting guide) |
 | `scripts/dev_env.py` | Writes a development `.env` from `.env.example` |
+| `scripts/export_openapi.py` | Regenerates `docs/openapi.json`, the published OpenAPI document (`--check` fails if it is stale) |
+| `docs/` | `openapi.json`, [self-hosting guide](docs/self-hosting.md), [OAuth account-linking design](docs/oauth-account-linking.md) |
 | `tests/` | pytest suite; database tests need `DATABASE_URL` and create a throwaway database. `tests/accounts.py` creates a signed-in member for API tests |
 | `tests/vectors/` | Shared ingredient-line test vectors, also run by the iOS app's Swift package (D-033); format in its README |
+
+### OpenAPI
+
+`docs/openapi.json` is the api's OpenAPI document, committed so clients (the iOS app, connector authors) can read it without running the server. After changing a route or a request/response model, regenerate it with `uv run python scripts/export_openapi.py` (or `docker compose exec api python scripts/export_openapi.py`) and commit it; `tests/test_openapi.py` fails while it is stale. A running server also serves it at `/openapi.json`, with interactive docs at `/docs`.
 
 ### Dependencies
 
@@ -130,17 +138,19 @@ PowerSync reads Postgres through logical replication (`wal_level=logical`) as `p
 Sign-in methods (architecture §9, D-015):
 
 - **Sign in with Apple:** the app sends Apple's identity token and the raw nonce to `POST /v1/auth/apple`. The api checks the signature against Apple's published keys (fetched from `appleid.apple.com` and cached), the issuer, the audience (`APPLE_BUNDLE_ID`), expiry, and that the token's nonce is SHA-256 of the raw nonce. Leave `APPLE_BUNDLE_ID` blank to turn it off.
-- **Email magic link:** `POST /v1/auth/email/request` emails a link (`MAGIC_LINK_URL?token=...`, a universal link into the app); the app then posts the token to `POST /v1/auth/email/verify`. Links are single-use and expire after `MAGIC_LINK_TTL_MINUTES`. The request endpoint answers the same way whether or not an account exists, and is rate-limited per address and per client. Without SMTP settings, email sign-in is off and `/v1/capabilities` reports `email_sign_in: false`. In development, mail goes to the Mailpit container: open `http://localhost:8025` (or `MAILPIT_PORT`) to read it.
+- **Email magic link:** `POST /v1/auth/email/request` emails a link (`MAGIC_LINK_URL?token=...`, a universal link into the app); the app then posts the token to `POST /v1/auth/email/verify`. Links are single-use and expire after `MAGIC_LINK_TTL_MINUTES`. The request endpoint answers the same way whether or not an account exists, and is rate-limited per address and per client (see "Rate limits" below). Without SMTP settings, email sign-in is off and `/v1/capabilities` reports `email_sign_in: false`. In development, mail goes to the Mailpit container: open `http://localhost:8025` (or `MAILPIT_PORT`) to read it.
 
-Both return the api's own tokens: a short-lived access token (HS256 JWT signed with `AUTH_JWT_SECRET`, sent as `Authorization: Bearer ...`) and a refresh token. Refresh tokens are opaque, stored only as hashes, and rotate on every `POST /v1/auth/refresh`; presenting an already-used refresh token revokes that whole sign-in (theft detection). `POST /v1/auth/logout` revokes one device, `POST /v1/auth/logout-all` every device. `GET /v1/me` returns the user and their households.
+Both return the api's own tokens: a short-lived access token (HS256 JWT signed with `AUTH_JWT_SECRET`, sent as `Authorization: Bearer ...`) and a refresh token. Refresh tokens are opaque, stored only as hashes, and rotate on every `POST /v1/auth/refresh`; presenting an already-used refresh token revokes that whole sign-in (theft detection). The one exception is a reuse within `REFRESH_REUSE_GRACE_SECONDS` (default 30) of the rotation while the new token is still live, which is what two requests racing with the same token or a retry after a lost response look like: that caller gets the very same new pair. Successor refresh tokens are derived from the old one with an HMAC keyed by `AUTH_JWT_SECRET`, so the server can hand out the same pair again while still storing only hashes. A replay after the window, of an older generation, or after logout is still theft. `POST /v1/auth/logout` revokes one device, `POST /v1/auth/logout-all` every device. `GET /v1/me` returns the user and their households.
 
 **Households** are the data boundary. A user gets a household on first sign-in and can create more (`POST /v1/households`). Owners invite people with single-use codes (`POST /v1/households/{id}/invites`), rename the household, change roles and remove members; anyone can `POST /v1/households/join` with a code and `POST /v1/households/{id}/leave`. Every household route, and every synced write, checks membership; non-members get 404.
+
+**Rate limits.** Magic-link requests are limited per email address and per client address, and invite-code joins per user and per client address, so links can't be used to spam an inbox and invite codes can't be guessed. Each rule is a fixed window configured as `N/period` (`RATE_LIMIT_MAGIC_LINK_PER_EMAIL=5/hour`, `RATE_LIMIT_MAGIC_LINK_PER_IP=20/hour`, `RATE_LIMIT_INVITE_JOIN_PER_USER=10/hour`, `RATE_LIMIT_INVITE_JOIN_PER_IP=30/hour`; `0` turns a rule off, `RATE_LIMIT_ENABLED=false` all of them). Over the limit the api answers `429` with `Retry-After` in seconds. Counters are kept in Redis under hashed keys, shared by every api process; if Redis is unreachable the limiter lets requests through and logs a warning. Behind a proxy, set `CLIENT_IP_HEADER` (e.g. `CF-Connecting-IP` for Cloudflare Tunnel) so the limit counts real clients, not the proxy (`thymble.ratelimit`).
 
 **Household-scoped routes** (recipes, meal plan, imports, shopping, stores, trips, connectors) take the access token and name the household explicitly in an `X-Thymble-Household: <household id>` header; the server checks that the user is a member (`thymble.auth.deps.get_current_household`). A missing header is `400`, a household the user isn't in is `404`. There is no default household and no development shortcut.
 
 **Sync writes.** `POST /v1/sync/upload` takes the PowerSync upload queue (`{"batch": [{"op": "PUT"|"PATCH"|"DELETE", "table", "id", "opData"}]}`) and applies it in one transaction: each row must belong to one of the user's households, rows can't move between households, foreign keys must point into the same household, and only registered tables and columns are accepted (`GET /v1/sync/tables` lists them). Writable: recipes (lines, steps, tags), the meal plan, shopping lists, items and item sources, trips, stores, store groups and item preferences. Columns with server logic behind them stay with the REST endpoints: trip status and order export (`trip_id`), stop-gap links (`bridge_of`), a store's external list, connector provenance. Writes with side effects run the same domain code as REST (`before_write` / `on_delete` hooks in `src/thymble/sync/tables.py`): urgency creates or removes the stop-gap, deleting a plan entry subtracts its share from the list. DELETE is a soft delete. A 4xx names the failing entry and nothing is written; the client should report and drop that batch rather than retry it. New features make their tables writable with `thymble.sync.register(SyncTable(Model, ...))`; see `src/thymble/sync/registry.py`.
 
-Alexa account linking will need an OAuth2 authorization-code endpoint; tokens already carry a `client_id` so it can reuse the same token machinery (see `src/thymble/auth/__init__.py`).
+Alexa account linking will need an OAuth2 authorization-code endpoint; tokens already carry a `client_id` so it can reuse the same token machinery. The design (endpoints, flow, storage, scopes) is in [docs/oauth-account-linking.md](docs/oauth-account-linking.md); nothing of it is implemented yet.
 
 ## Contributing
 See [CONTRIBUTING.md](CONTRIBUTING.md). Contributions are signed off under the [Developer Certificate of Origin](https://developercertificate.org/).

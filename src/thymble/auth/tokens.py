@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import binascii
 import hashlib
+import hmac
 import secrets
 import uuid
 from dataclasses import dataclass
@@ -56,9 +57,19 @@ def _access_key(settings: Settings) -> str:
 
 
 def create_access_token(
-    settings: Settings, user_id: uuid.UUID, client_id: str = APP_CLIENT_ID
+    settings: Settings,
+    user_id: uuid.UUID,
+    client_id: str = APP_CLIENT_ID,
+    *,
+    issued: datetime | None = None,
+    jti: str | None = None,
 ) -> tuple[str, int]:
-    issued = now()
+    """A signed access token and its lifetime in seconds.
+
+    `issued` and `jti` pin the token's contents, so the same inputs mint the same token
+    (used to hand both callers of a raced refresh an identical pair).
+    """
+    issued = issued or now()
     ttl = settings.access_token_ttl_seconds
     claims = {
         "iss": settings.thymble_public_url,
@@ -67,7 +78,7 @@ def create_access_token(
         "client_id": client_id,
         "iat": issued,
         "exp": issued + timedelta(seconds=ttl),
-        "jti": uuid.uuid4().hex,
+        "jti": jti or uuid.uuid4().hex,
     }
     return jwt.encode(claims, _access_key(settings), algorithm="HS256"), ttl
 
@@ -93,8 +104,9 @@ def issue_refresh_token(
     user_id: uuid.UUID,
     client_id: str,
     family_id: uuid.UUID | None = None,
+    token: str | None = None,
 ) -> str:
-    token = new_secret()
+    token = token or new_secret()
     db.add(
         RefreshToken(
             user_id=user_id,
@@ -132,11 +144,73 @@ def _invalid_refresh() -> HTTPException:
     return HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid refresh token")
 
 
+def _successor(settings: Settings, token: str) -> str:
+    """The refresh token that rotating `token` issues.
+
+    Derived (HMAC with AUTH_JWT_SECRET) rather than random, so a second caller presenting
+    the same token inside the grace window can be given the very same successor without
+    the server ever storing it: only its hash is in the database, as for every token.
+    """
+    key = _access_key(settings).encode()
+    mac = hmac.new(key, b"thymble-refresh-rotation:" + token.encode(), hashlib.sha256)
+    return base64.urlsafe_b64encode(mac.digest()).decode().rstrip("=")
+
+
+def _rotation_pair(
+    settings: Settings, row: RefreshToken, successor: str, rotated_at: datetime
+) -> TokenPair:
+    """The pair a rotation of `row` at `rotated_at` hands out; identical on every call."""
+    access, ttl = create_access_token(
+        settings,
+        row.user_id,
+        row.client_id,
+        issued=rotated_at,
+        jti=hash_secret("access:" + successor)[:32],
+    )
+    remaining = ttl - int((now() - rotated_at).total_seconds())
+    return TokenPair(
+        user_id=row.user_id,
+        access_token=access,
+        expires_in=max(1, min(ttl, remaining)),
+        refresh_token=successor,
+    )
+
+
+def _grace_replay(
+    db: Session, settings: Settings, row: RefreshToken, token: str, current: datetime
+) -> TokenPair | None:
+    """The pair from `row`'s recent rotation, if this is a reuse inside the grace window.
+
+    Only a token that was *rotated* (its successor exists and is still live) qualifies; a
+    token revoked by logout or theft detection never does, and neither does one whose
+    successor has itself been rotated or revoked since.
+    """
+    grace = settings.refresh_reuse_grace_seconds
+    if grace <= 0 or row.revoked_at is None:
+        return None
+    if current - row.revoked_at > timedelta(seconds=grace):
+        return None
+    successor = _successor(settings, token)
+    live = db.scalar(
+        select(RefreshToken.id).where(
+            RefreshToken.token_hash == hash_secret(successor),
+            RefreshToken.family_id == row.family_id,
+            RefreshToken.revoked_at.is_(None),
+            RefreshToken.expires_at > current,
+        )
+    )
+    if live is None:
+        return None
+    return _rotation_pair(settings, row, successor, row.revoked_at)
+
+
 def rotate_refresh_token(db: Session, settings: Settings, token: str) -> TokenPair:
     """Exchange a refresh token for a new pair; the old token stops working.
 
     Presenting an already-rotated or revoked token is treated as theft: the whole token
-    family is revoked. Commits.
+    family is revoked. The exception is a reuse within REFRESH_REUSE_GRACE_SECONDS of the
+    rotation while its successor is still live (two requests racing with the same token,
+    or a retry after a lost response): that caller gets the same new pair. Commits.
     """
     row = db.scalars(
         select(RefreshToken).where(RefreshToken.token_hash == hash_secret(token)).with_for_update()
@@ -145,13 +219,19 @@ def rotate_refresh_token(db: Session, settings: Settings, token: str) -> TokenPa
         raise _invalid_refresh()
     current = now()
     if row.revoked_at is not None:
+        replay = _grace_replay(db, settings, row, token, current)
+        if replay is not None:
+            db.rollback()
+            return replay
         revoke_family(db, row.family_id)
         db.commit()
         raise _invalid_refresh()
     if row.expires_at <= current:
         raise _invalid_refresh()
     row.revoked_at = current
-    pair = issue_token_pair(db, settings, row.user_id, row.client_id, row.family_id)
+    successor = _successor(settings, token)
+    issue_refresh_token(db, settings, row.user_id, row.client_id, row.family_id, successor)
+    pair = _rotation_pair(settings, row, successor, current)
     db.commit()
     return pair
 

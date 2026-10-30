@@ -69,8 +69,15 @@ def test_refresh_rotates(api, alice):
 
 
 @pytest.mark.db
-def test_refresh_reuse_revokes_family(api, alice):
+def test_refresh_reuse_revokes_family(api, alice, db):
     rotated = api.post("/v1/auth/refresh", json={"refresh_token": alice.refresh_token}).json()
+    # Outside the reuse grace window (test_refresh_grace.py covers the window itself).
+    db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.revoked_at.is_not(None))
+        .values(revoked_at=now() - timedelta(minutes=5))
+    )
+    db.commit()
     # Someone replays the old token: rejected, and the rotated one dies with it.
     replay = api.post("/v1/auth/refresh", json={"refresh_token": alice.refresh_token})
     assert replay.status_code == 401

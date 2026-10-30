@@ -91,6 +91,23 @@ class Settings(BaseSettings):
     magic_link_url: str = ""
     magic_link_ttl_minutes: int = 15
     household_invite_ttl_hours: int = 168
+    # Refresh-token reuse grace: a refresh token presented again within this many seconds
+    # of its rotation (two devices or a retried request racing) gets the same new pair
+    # instead of tripping theft detection. 0 turns the grace off.
+    refresh_reuse_grace_seconds: int = Field(default=30, ge=0, le=300)
+
+    # Rate limits (thymble.ratelimit): "N/period" such as "5/hour" or "20/10min";
+    # "0" turns one rule off. Counters live in Redis (REDIS_URL) unless storage is
+    # "memory" (per process; single-process setups and tests).
+    rate_limit_enabled: bool = True
+    rate_limit_storage: Literal["redis", "memory"] = "redis"
+    rate_limit_magic_link_per_email: str = "5/hour"
+    rate_limit_magic_link_per_ip: str = "20/hour"
+    rate_limit_invite_join_per_user: str = "10/hour"
+    rate_limit_invite_join_per_ip: str = "30/hour"
+    # Header carrying the real client address when a proxy sits in front of the api
+    # (CF-Connecting-IP behind Cloudflare Tunnel). Empty: the connection's peer address.
+    client_ip_header: str = ""
 
     # Encrypts connector credentials at rest (HA tokens, retailer OAuth tokens).
     connector_encryption_key: SecretStr = SecretStr("")
@@ -106,6 +123,19 @@ class Settings(BaseSettings):
     def _split_commas(cls, value: object) -> object:
         if isinstance(value, str):
             return [part.strip() for part in value.split(",") if part.strip()]
+        return value
+
+    @field_validator(
+        "rate_limit_magic_link_per_email",
+        "rate_limit_magic_link_per_ip",
+        "rate_limit_invite_join_per_user",
+        "rate_limit_invite_join_per_ip",
+    )
+    @classmethod
+    def _check_limit(cls, value: str) -> str:
+        from thymble.ratelimit import parse_limit
+
+        parse_limit(value)
         return value
 
     @property
