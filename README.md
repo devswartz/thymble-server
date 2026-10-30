@@ -18,7 +18,7 @@ Planned: retailer connectors that send the list to grocery carts, and learning f
 Python / FastAPI · PostgreSQL · PowerSync (offline sync to the app) · Redis + arq (background jobs) · Docker Compose
 
 ## Self-hosting
-Thymble is designed to run on a home server. Docker Compose files and setup docs will land here as the server takes shape.
+Thymble is designed to run on a home server. [docs/self-hosting.md](docs/self-hosting.md) covers the production stack (`docker-compose.yml` + `docker-compose.prod.yml`: api, worker, PowerSync, Postgres, Redis, a Cloudflare Tunnel connector and nightly encrypted backups), configuration, restores and upgrades.
 
 ## Development
 
@@ -58,6 +58,8 @@ If a host port is already taken, set `THYMBLE_API_PORT`, `POWERSYNC_PORT`, `POST
 | `migrations/` | Alembic migrations, one linear chain (`0001` → `auth_0002` → `import_0001` → `shop_0001`). Create one with `docker compose exec api alembic revision --autogenerate -m "..."` |
 | `deploy/postgres/` | First-boot SQL for PowerSync: replication role, publication, storage database |
 | `deploy/powersync/` | PowerSync service config and sync config (what each device downloads, scoped by household) |
+| `deploy/backup/` | The backup image used by `docker-compose.prod.yml`: `thymble-backup` (nightly `pg_dump`, age, rclone) and `thymble-restore` |
+| `docker-compose.prod.yml` | Production overlay: no host ports, data under `/opt/thymble`, cloudflared, backups (see the self-hosting guide) |
 | `scripts/dev_env.py` | Writes a development `.env` from `.env.example` |
 | `scripts/export_openapi.py` | Regenerates `docs/openapi.json`, the published OpenAPI document (`--check` fails if it is stale) |
 | `docs/` | `openapi.json`, [self-hosting guide](docs/self-hosting.md), [OAuth account-linking design](docs/oauth-account-linking.md) |
