@@ -54,8 +54,8 @@ If a host port is already taken, set `THYMBLE_API_PORT`, `POWERSYNC_PORT`, `POST
 
 | Path | What it is |
 |---|---|
-| `src/thymble/` | The Python package: `main.py` (FastAPI app), `config.py` (settings from env vars), `api/` (routes), `auth/` (sign-in, tokens, the current-user and household dependencies), `db/` + `models/` (SQLAlchemy), `sync/` (PowerSync upload: table registry and applier), `importer/` (recipe import pipeline), `llm/` (LLM providers, routing, cache, metering), `shopping/` (list merging, stores, urgency, trips, voice-entry rules), `connectors/` (Home Assistant list connector), `worker.py` (arq jobs: imports, trip reminders, connector supervisor) |
-| `migrations/` | Alembic migrations, one linear chain (`0001` → `auth_0002` → `import_0001` → `shop_0001`). Create one with `docker compose exec api alembic revision --autogenerate -m "..."` |
+| `src/thymble/` | The Python package: `main.py` (FastAPI app), `config.py` (settings from env vars), `api/` (routes), `auth/` (sign-in, tokens, the current-user and household dependencies), `db/` + `models/` (SQLAlchemy), `sync/` (PowerSync upload: table registry and applier), `importer/` (recipe import pipeline), `llm/` (LLM providers, routing, cache, metering), `shopping/` (list merging, stores, urgency, trips, voice-entry rules), `connectors/` (Home Assistant list connector), `units.py` (the one table of unit codes and conversions, used by the importer and the shopping list), `worker.py` (arq jobs: imports, trip reminders, connector supervisor) |
+| `migrations/` | Alembic migrations, one linear chain (`0001` → `auth_0002` → `import_0001` → `shop_0001` → `plan_0001`). Create one with `docker compose exec api alembic revision --autogenerate -m "..."` |
 | `deploy/postgres/` | First-boot SQL for PowerSync: replication role, publication, storage database |
 | `deploy/powersync/` | PowerSync service config and sync config (what each device downloads, scoped by household) |
 | `scripts/dev_env.py` | Writes a development `.env` from `.env.example` |

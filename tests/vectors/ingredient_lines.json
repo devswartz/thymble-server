@@ -394,6 +394,84 @@
       }
     },
     {
+      "id": "U09",
+      "kind": "recipe_line",
+      "tags": [
+        "unit-alias",
+        "fl-oz"
+      ],
+      "input": "8 fl oz heavy cream",
+      "expect": {
+        "quantity": 8,
+        "quantity_max": null,
+        "unit": "fl_oz",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "heavy cream"
+      }
+    },
+    {
+      "id": "U10",
+      "kind": "recipe_line",
+      "tags": [
+        "unit-alias"
+      ],
+      "input": "2 pints vegetable stock",
+      "expect": {
+        "quantity": 2,
+        "quantity_max": null,
+        "unit": "pt",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "vegetable stock"
+      }
+    },
+    {
+      "id": "U11",
+      "kind": "recipe_line",
+      "tags": [
+        "unit-alias"
+      ],
+      "input": "1 quart buttermilk",
+      "expect": {
+        "quantity": 1,
+        "quantity_max": null,
+        "unit": "qt",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "buttermilk"
+      }
+    },
+    {
+      "id": "U12",
+      "kind": "recipe_line",
+      "tags": [
+        "unit-alias",
+        "count"
+      ],
+      "input": "3 pieces crystallized ginger",
+      "expect": {
+        "quantity": 3,
+        "quantity_max": null,
+        "unit": "ct",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "crystallized ginger"
+      }
+    },
+    {
       "id": "W01",
       "kind": "recipe_line",
       "tags": [
@@ -1315,6 +1393,23 @@
         "store": null,
         "is_food": true,
         "name": "bread"
+      }
+    },
+    {
+      "id": "V20",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "unit"
+      ],
+      "input": "2 pints ice cream",
+      "expect": {
+        "quantity": 2,
+        "unit": "pt",
+        "urgent": false,
+        "store": null,
+        "is_food": true,
+        "name": "ice cream"
       }
     }
   ]

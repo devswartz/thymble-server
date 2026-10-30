@@ -50,7 +50,7 @@ UTF-8 JSON, LF line endings:
 |---|---|---|
 | `quantity` | number or null | First amount on the line. Word numbers resolved ("a dozen" = 12, "half a" = 0.5, "a couple of" = 2, "a pinch" = 1). Simple arithmetic resolved ("2 cups minus 2 tablespoons" = 1.875 cup). |
 | `quantity_max` | number or null | Upper end of a range ("2-3", "1 to 2", "4–6"); null otherwise. |
-| `unit` | string or null | Canonical code: `cup`, `tbsp`, `tsp`, `lb`, `oz`, `g`, `kg`, `ml`, `l`, `can` (also "tin"), `clove`, `pinch`, ... (see `UNIT_ALIASES` in `src/thymble/importer/rules.py`). Capital `T` = tbsp, small `t` = tsp. |
+| `unit` | string or null | Canonical unit code (below). Capital `T` = tbsp, small `t` = tsp. |
 | `name` | string | The thing you buy, compound names kept whole ("all-purpose flour"). Brand names of the same product are dropped. |
 | `additional` | list of strings | Extra **separate shopping items**: "and", "&", "and/or", "EACH x and y". |
 | `alternatives` | list of strings | Substitutes for the **same item**: "or", "sub", "(or X)". |
@@ -62,6 +62,25 @@ UTF-8 JSON, LF line endings:
 make one item with substitutes; "or" between two names or brands of the same product
 ("Diamond Crystal or Morton kosher salt", "cornflour / cornstarch") is one item with no
 substitutes; "or as needed" and "half-and-half" are never split.
+
+### Unit codes
+
+Recipe lines and voice items use the same codes; the server's one table is
+`src/thymble/units.py` (`UNITS`, with every accepted spelling in `ALIASES`). Codes are
+lower-case ASCII with no spaces:
+
+| kind | codes |
+|---|---|
+| volume | `ml`, `cl`, `dl`, `l`, `tsp`, `tbsp`, `fl_oz`, `cup`, `pt`, `qt`, `gal` |
+| mass | `mg`, `g`, `kg`, `oz` (weight ounce), `lb` |
+| length | `cm`, `inch` |
+| count | `ct` ("each", "piece", "pc"; left out of display text) |
+| other | `can` (also "tin"), `clove`, `stick`, `sheet`, `pinch`, `dash`, `bunch`, `package`, `slice`, `sprig`, `drop`, `jar`, `handful`, `head`, `stalk`, `bag`, `bottle`, `box` |
+
+Plurals of any spelling map to the same code ("fluid ounces" = `fl_oz`). A unit not in the
+table comes back lower-case and singular. Changed in vectors U09-U12 and V20: fluid
+ounces are `fl_oz` (was "fl oz" in recipe lines), pints `pt` and quarts `qt` (were "pint" and
+"quart" on the shopping list), pieces `ct` (was "piece" in recipe lines).
 
 ### `voice_item` fields
 

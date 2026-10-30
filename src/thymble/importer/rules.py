@@ -14,59 +14,18 @@ import re
 import unicodedata
 from fractions import Fraction
 
+from thymble import units
+
 # ---------------------------------------------------------------------------------- units
 
-# Canonical unit codes stored in recipe_ingredient.unit.
-UNIT_ALIASES: dict[str, str] = {
-    "cup": "cup", "cups": "cup", "c": "cup", "c.": "cup",
-    "tablespoon": "tbsp", "tablespoons": "tbsp", "tbsp": "tbsp", "tbsps": "tbsp",
-    "tbs": "tbsp", "tbl": "tbsp", "tbls": "tbsp",
-    "teaspoon": "tsp", "teaspoons": "tsp", "tsp": "tsp", "tsps": "tsp",
-    "pound": "lb", "pounds": "lb", "lb": "lb", "lbs": "lb",
-    "ounce": "oz", "ounces": "oz", "oz": "oz",
-    "fluid ounce": "fl oz", "fluid ounces": "fl oz", "fl oz": "fl oz", "fl. oz": "fl oz",
-    "gram": "g", "grams": "g", "g": "g", "gr": "g",
-    "kilogram": "kg", "kilograms": "kg", "kg": "kg", "kilo": "kg", "kilos": "kg",
-    "milligram": "mg", "milligrams": "mg", "mg": "mg",
-    "milliliter": "ml", "milliliters": "ml", "millilitre": "ml", "millilitres": "ml", "ml": "ml",
-    "centiliter": "cl", "centilitre": "cl", "cl": "cl",
-    "deciliter": "dl", "decilitre": "dl", "dl": "dl",
-    "liter": "l", "liters": "l", "litre": "l", "litres": "l", "l": "l",
-    "pint": "pt", "pints": "pt", "pt": "pt",
-    "quart": "qt", "quarts": "qt", "qt": "qt",
-    "gallon": "gal", "gallons": "gal", "gal": "gal",
-    "inch": "inch", "inches": "inch", "centimeter": "cm", "cm": "cm",
-    "can": "can", "cans": "can", "tin": "can", "tins": "can",
-    "clove": "clove", "cloves": "clove",
-    "stick": "stick", "sticks": "stick",
-    "sheet": "sheet", "sheets": "sheet",
-    "pinch": "pinch", "pinches": "pinch", "dash": "dash", "dashes": "dash",
-    "bunch": "bunch", "bunches": "bunch",
-    "package": "package", "packages": "package", "packet": "package", "packets": "package",
-    "pkg": "package",
-    "slice": "slice", "slices": "slice",
-    "sprig": "sprig", "sprigs": "sprig",
-    "drop": "drop", "drops": "drop",
-    "jar": "jar", "jars": "jar",
-    "handful": "handful", "handfuls": "handful",
-    "head": "head", "heads": "head",
-    "stalk": "stalk", "stalks": "stalk",
-    "piece": "piece", "pieces": "piece",
-    "bag": "bag", "bags": "bag", "bottle": "bottle", "bottles": "bottle",
-}  # fmt: skip
+# Canonical unit codes and their spellings live in `thymble.units`, shared with the
+# shopping list; the import pipeline uses the same table.
+UNIT_ALIASES: dict[str, str] = units.ALIASES
 
 
 def norm_unit(unit: object) -> str | None:
     """Map a unit string (or a pint unit) to a canonical code; unknown units pass through."""
-    if unit is None or unit == "":
-        return None
-    s = str(unit).strip().rstrip(".")
-    if s == "T":  # old cookbooks: capital T = tablespoon, small t = teaspoon
-        return "tbsp"
-    if s == "t":
-        return "tsp"
-    s = s.lower().replace("_", " ")
-    return UNIT_ALIASES.get(s, s)
+    return units.normalize(unit)
 
 
 # ---------------------------------------------------------------------------------- numbers

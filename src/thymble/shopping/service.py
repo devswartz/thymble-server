@@ -19,6 +19,7 @@ from decimal import Decimal
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
+from thymble import units
 from thymble.models import (
     Ingredient,
     IngredientAlias,
@@ -35,7 +36,6 @@ from thymble.models import (
     Trip,
     Urgency,
 )
-from thymble.shopping import units
 from thymble.shopping.errors import NotFound, ShoppingError
 from thymble.shopping.text import STOPGAP_SUFFIX, name_key, name_variants
 
@@ -391,7 +391,7 @@ class ShoppingService:
         for item in self.session.scalars(q.order_by(ShoppingItem.created_at, ShoppingItem.id)):
             if ingredient_id is None and name_key(item.display_text) != name_key(name):
                 continue
-            if quantity is None or item.quantity is None or units.compatible(item.unit, unit):
+            if units.mergeable(item.quantity, item.unit, quantity, unit):
                 return item
         return None
 
@@ -447,7 +447,7 @@ class ShoppingService:
         name = " ".join(name.strip().split())
         if not name:
             raise ShoppingError("item name is empty")
-        unit = units.normalize_unit(unit)
+        unit = units.normalize(unit)
         quantity = Decimal(quantity) if quantity is not None else None
         if ingredient_id is None and resolve:
             ing = self.resolve_ingredient(name)
@@ -458,12 +458,9 @@ class ShoppingService:
 
         existing = self.find_open(list_id, ingredient_id, name, quantity, unit) if merge else None
         if existing is not None:
-            if quantity is not None:
-                if existing.quantity is None:
-                    existing.quantity, existing.unit = quantity, unit
-                else:
-                    extra = units.convert(quantity, unit, existing.unit)
-                    existing.quantity = (existing.quantity + (extra or 0)).quantize(units.QUANTUM)
+            existing.quantity, existing.unit = units.merge(
+                existing.quantity, existing.unit, quantity, unit
+            )
             if explicit:
                 existing.store_id, existing.store_group_id = store_id, store_group_id
             self._add_source(
@@ -552,7 +549,7 @@ class ShoppingService:
         if clear_quantity:
             item.quantity, item.unit = None, None
         elif quantity is not None:
-            item.quantity, item.unit = quantity, units.normalize_unit(unit)
+            item.quantity, item.unit = quantity, units.normalize(unit)
         if aisle is not None:
             item.aisle = aisle or None
         self._touch(item)

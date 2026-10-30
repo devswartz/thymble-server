@@ -17,7 +17,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
-from thymble.shopping.units import normalize_unit
+from thymble.units import normalize as normalize_unit
 
 # Suffix Thymble adds to stop-gap mirrors (design decision: "<name> (small)").
 STOPGAP_SUFFIX = " (small)"

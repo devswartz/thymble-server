@@ -13,6 +13,7 @@ from decimal import Decimal
 
 from sqlalchemy import select
 
+from thymble import units
 from thymble.models import (
     Ingredient,
     ItemSourceType,
@@ -23,7 +24,6 @@ from thymble.models import (
     ShoppingItem,
     ShoppingItemSource,
 )
-from thymble.shopping import units
 from thymble.shopping.errors import NotFound, ShoppingError
 from thymble.shopping.service import ShoppingService, utcnow
 

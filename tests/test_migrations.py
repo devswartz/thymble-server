@@ -123,3 +123,94 @@ def test_synced_tables_carry_sync_columns(db_url):
                 assert "deleted_at" in columns, table
     finally:
         engine.dispose()
+
+
+def test_plan_0001_rewrites_unit_codes(db_url):
+    """Rows written with the importer's and the shopping list's old codes get one code."""
+    cfg = alembic_config(db_url)
+    command.downgrade(cfg, "base")  # the module's database may already be at head
+    command.upgrade(cfg, "shop_0001")
+    engine = create_engine(db_url)
+    ids = {name: uuid.uuid4() for name in ("hh", "recipe", "list", "ing", "group")}
+    lines = {"fl oz": uuid.uuid4(), "piece": uuid.uuid4(), "cup": uuid.uuid4()}
+    items = {"pint": uuid.uuid4(), "quart": uuid.uuid4(), "boxe": uuid.uuid4()}
+
+    def units(table: str, column: str = "unit") -> dict[uuid.UUID, str]:
+        with engine.connect() as conn:
+            rows = conn.execute(text(f'SELECT id, "{column}" FROM "{table}"'))
+            return {row[0]: row[1] for row in rows}
+
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text("INSERT INTO household (id, name) VALUES (:hh, 'H')"), {"hh": ids["hh"]}
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO recipe (id, household_id, title, source_type) "
+                    "VALUES (:id, :hh, 'R', 'manual')"
+                ),
+                {"id": ids["recipe"], "hh": ids["hh"]},
+            )
+            for pos, (unit, line_id) in enumerate(lines.items()):
+                conn.execute(
+                    text(
+                        "INSERT INTO recipe_ingredient "
+                        "(id, household_id, recipe_id, position, raw_text, unit) "
+                        "VALUES (:id, :hh, :r, :pos, 'x', :unit)"
+                    ),
+                    {"id": line_id, "hh": ids["hh"], "r": ids["recipe"], "pos": pos, "unit": unit},
+                )
+            conn.execute(
+                text("INSERT INTO shopping_list (id, household_id, name) VALUES (:id, :hh, 'L')"),
+                {"id": ids["list"], "hh": ids["hh"]},
+            )
+            for unit, item_id in items.items():
+                conn.execute(
+                    text(
+                        "INSERT INTO shopping_item (id, household_id, list_id, display_text, "
+                        "unit, status, urgency) VALUES (:id, :hh, :l, 'x', :unit, 'needed', "
+                        "'normal')"
+                    ),
+                    {"id": item_id, "hh": ids["hh"], "l": ids["list"], "unit": unit},
+                )
+                conn.execute(
+                    text(
+                        "INSERT INTO shopping_item_source (id, household_id, shopping_item_id, "
+                        "source_type, unit) VALUES (:id, :hh, :item, 'manual', :unit)"
+                    ),
+                    {"id": item_id, "hh": ids["hh"], "item": item_id, "unit": unit},
+                )
+            conn.execute(
+                text("INSERT INTO ingredient (id, name) VALUES (:id, 'milk')"), {"id": ids["ing"]}
+            )
+            conn.execute(
+                text("INSERT INTO store_group (id, household_id, name) VALUES (:id, :hh, 'G')"),
+                {"id": ids["group"], "hh": ids["hh"]},
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO item_store_pref (id, household_id, ingredient_id, "
+                    "store_group_id, typical_unit) VALUES (:id, :hh, :ing, :g, 'quart')"
+                ),
+                {"id": ids["ing"], "hh": ids["hh"], "ing": ids["ing"], "g": ids["group"]},
+            )
+
+        command.upgrade(cfg, "plan_0001")
+        assert units("recipe_ingredient") == {
+            lines["fl oz"]: "fl_oz",
+            lines["piece"]: "ct",
+            lines["cup"]: "cup",
+        }
+        expected_items = {items["pint"]: "pt", items["quart"]: "qt", items["boxe"]: "box"}
+        assert units("shopping_item") == expected_items
+        assert units("shopping_item_source") == expected_items
+        assert units("item_store_pref", "typical_unit") == {ids["ing"]: "qt"}
+
+        command.downgrade(cfg, "shop_0001")
+        assert units("recipe_ingredient")[lines["fl oz"]] == "fl oz"
+        assert units("recipe_ingredient")[lines["piece"]] == "piece"
+        assert units("shopping_item")[items["pint"]] == "pint"
+        assert units("item_store_pref", "typical_unit") == {ids["ing"]: "quart"}
+    finally:
+        engine.dispose()
