@@ -112,14 +112,23 @@ def trip_view(svc: ShoppingService, trip: Trip) -> TripView:
     view = TripView(trip=trip, store=store)
     needed = _household_items(svc, [ItemStatus.NEEDED])
     on_order = _household_items(svc, [ItemStatus.ON_ORDER])
-    # Urgent bulk items whose short-term need is covered by an open stop-gap.
-    bridged = {i.bridge_of for i in needed + on_order if i.bridge_of is not None}
-    for item in needed:
-        here = item.store_id == store.id or (
+
+    def is_here(item: ShoppingItem) -> bool:
+        return item.store_id == store.id or (
             item.store_group_id is not None and item.store_group_id in groups
         )
+
+    # Urgent bulk items whose short-term need is covered by an open stop-gap.
+    bridged = {i.bridge_of for i in needed + on_order if i.bridge_of is not None}
+    # Bulk items this trip can buy (D-029: shopping at the bulk store itself). Buying one
+    # clears its stop-gaps too, so here the bulk item is needed now and its stop-gaps hide.
+    bulk_here = {i.id for i in needed if i.bridge_of is None and is_here(i)}
+    for item in needed:
+        if item.bridge_of is not None and item.bridge_of in bulk_here:
+            continue
+        here = is_here(item)
         urgent = item.bridge_of is not None or (
-            item.urgency == Urgency.URGENT and item.id not in bridged
+            item.urgency == Urgency.URGENT and (item.id not in bridged or item.id in bulk_here)
         )
         if urgent:
             view.needed_now.append(item)
