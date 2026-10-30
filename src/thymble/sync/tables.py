@@ -1,6 +1,9 @@
 """Tables devices can write through the PowerSync upload endpoint.
 
-Recipes (with lines, steps, tags; imported drafts are finalized by clearing `is_draft`),
+Recipes (with lines, steps, tags). An imported draft whose review state is needs_review is
+finalized through `POST /v1/recipes/{id}/review` (D-034), which checks that every "low" item
+was confirmed or edited; other drafts are finalized by clearing `is_draft`. Import confidence
+(`review_state`, `confidence`, `review`) is server-owned and read-only here.
 the meal plan, the shopping list with item provenance, trips, stores, store groups and
 per-item store preferences. Every write is household-checked by the upload applier.
 
@@ -26,6 +29,7 @@ from thymble.models import (
     RecipeIngredient,
     RecipeStep,
     RecipeTag,
+    ReviewState,
     ShoppingItem,
     ShoppingItemSource,
     ShoppingList,
@@ -45,6 +49,14 @@ def _recipe_author(
 ) -> None:
     if inserting:
         row.created_by = ctx.user.id
+    # A draft with "low" items can't be finalized by clearing the flag (D-034).
+    if (
+        "is_draft" in changes
+        and not row.is_draft
+        and row.review_state == ReviewState.NEEDS_REVIEW
+        and row.deleted_at is None
+    ):
+        raise WriteRejected("finish the import review with POST /v1/recipes/{id}/review")
 
 
 def _shopping(ctx: WriteContext, household_id: uuid.UUID) -> ShoppingService:
@@ -86,10 +98,18 @@ def _source_kind(
         raise WriteRejected("connector sources are written by the server")
 
 
-# Recipes (an import lands as a draft; the app clears is_draft once the user has reviewed it).
-register(SyncTable(Recipe, readonly=frozenset({"created_by"}), before_write=_recipe_author))
-register(SyncTable(RecipeIngredient))
-register(SyncTable(RecipeStep))
+# Recipes (an import lands as a draft; it is finalized by the review endpoint, or by clearing
+# is_draft when it needed no review). Import confidence is written by the server only.
+IMPORT_REVIEW_COLUMNS = frozenset({"confidence", "review"})
+register(
+    SyncTable(
+        Recipe,
+        readonly=frozenset({"created_by", "review_state", "review"}),
+        before_write=_recipe_author,
+    )
+)
+register(SyncTable(RecipeIngredient, readonly=IMPORT_REVIEW_COLUMNS))
+register(SyncTable(RecipeStep, readonly=IMPORT_REVIEW_COLUMNS))
 register(SyncTable(Tag))
 register(SyncTable(RecipeTag))
 # Removing a plan entry takes its share off the shopping lists, as DELETE /v1/meal-plan does.

@@ -28,9 +28,26 @@ def _clip(value: str | None, size: int) -> str | None:
     return value[:size] if value else value
 
 
+def _item_review(item: dict[str, Any]) -> dict[str, Any]:
+    """What a line or step keeps for review: reasons, codes and the photo readings."""
+    return {
+        "reasons": item.get("reasons") or [],
+        "reason_codes": item.get("reason_codes") or [],
+        "readings": item.get("readings"),
+    }
+
+
 def save_draft(session: Any, job: Any, outcome: ImportOutcome) -> uuid.UUID:
-    """Write the outcome as a draft recipe (is_draft=True) with its lines and steps."""
-    from thymble.models import Recipe, RecipeIngredient, RecipeSourceType, RecipeStep
+    """Write the outcome as a draft recipe (is_draft=True) with its lines and steps, and
+    the confidence of every item for the review screen (D-034)."""
+    from thymble.models import (
+        ImportConfidence,
+        Recipe,
+        RecipeIngredient,
+        RecipeSourceType,
+        RecipeStep,
+        ReviewState,
+    )
 
     source_type = {
         "html": RecipeSourceType.URL,
@@ -55,6 +72,14 @@ def save_draft(session: Any, job: Any, outcome: ImportOutcome) -> uuid.UUID:
         image_url=d.image_url,
         created_by=job.created_by,
         is_draft=True,
+        review_state=ReviewState(outcome.review_state),
+        review={
+            "import_id": str(job.id),
+            "source_kind": str(job.source_kind),
+            "language": outcome.language,
+            "counts": outcome.confidence_counts,
+            "sections": outcome.sections,
+        },
     )
     session.add(recipe)
     session.flush()
@@ -71,6 +96,12 @@ def save_draft(session: Any, job: Any, outcome: ImportOutcome) -> uuid.UUID:
                 ingredient_id=uuid.UUID(line.ingredient_id) if line.ingredient_id else None,
                 preparation=line.preparation,
                 group_name=line.group,
+                confidence=ImportConfidence(line.confidence),
+                review={
+                    **_item_review(line.to_dict()),
+                    "parse_score": line.parse_score,
+                    "source": line.source,
+                },
             )
         )
     for position, step in enumerate(outcome.steps):
@@ -82,6 +113,8 @@ def save_draft(session: Any, job: Any, outcome: ImportOutcome) -> uuid.UUID:
                 text=step["text"],
                 group_name=step["group"],
                 timers=step["timers"],
+                confidence=ImportConfidence(step.get("confidence", "high")),
+                review=_item_review(step),
             )
         )
     return recipe.id
@@ -106,6 +139,8 @@ def _load(sessionmaker: Any, job_id: uuid.UUID) -> tuple[Any, ImportInput] | Non
             text=data.get("text"),
             photo=job.photo,
             photo_mime=job.photo_mime,
+            device_ocr_text=data.get("device_ocr_text"),
+            device_ocr_confidences=data.get("device_ocr_confidences"),
         )
         session.expunge(job)
         return job, item

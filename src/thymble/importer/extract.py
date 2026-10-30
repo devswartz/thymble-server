@@ -16,7 +16,7 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
-from thymble.importer import rules
+from thymble.importer import rules, textnorm
 
 log = logging.getLogger("thymble.importer")
 
@@ -44,6 +44,10 @@ class RecipeDraft:
     steps: list[tuple[str, str | None]] = field(default_factory=list)
     extracted_by: list[str] = field(default_factory=list)
     field_sources: dict[str, str] = field(default_factory=dict)
+    # Fields where the readers disagreed (import review, D-034): "title", "yield", "times"
+    # (list of time fields), "ingredients" / "steps" (comparable texts of the chosen lines
+    # another reader does not have).
+    disagreements: dict[str, Any] = field(default_factory=dict)
 
     @property
     def complete(self) -> bool:
@@ -218,7 +222,48 @@ def merge(drafts: list[RecipeDraft]) -> RecipeDraft:
                 out.field_sources["ingredients"] = draft.extracted_by[0]
                 break
     out.extracted_by = sorted(set(out.field_sources.values()))
+    out.disagreements = disagreements(drafts, out)
     return out
+
+
+def disagreements(drafts: list[RecipeDraft], chosen: RecipeDraft) -> dict[str, Any]:
+    """Where the readers (schema.org JSON-LD, generic and site scraper) don't agree on the
+    value the merge chose. Compared as normalized text, numbers and minutes."""
+    found: dict[str, Any] = {}
+    if len(drafts) < 2:
+        return found
+    titles = {textnorm.comparable(rules.clean_title(d.title)) for d in drafts if d.title}
+    if len(titles) > 1:
+        found["title"] = sorted(titles)
+    yields = {
+        rules.parse_yield(d.yield_raw)["quantity"]
+        for d in drafts
+        if d.yield_raw not in (None, "", [])
+    } - {None}
+    if len(yields) > 1:
+        found["yield"] = sorted(yields)  # type: ignore[type-var]
+    for attr in ("prep_time", "cook_time", "total_time"):
+        values = {
+            getattr(d, f"{attr}_minutes") or rules.parse_duration(getattr(d, f"{attr}_raw"))
+            for d in drafts
+        } - {None}
+        if len(values) > 1:
+            found.setdefault("times", []).append(attr)
+    for name in ("ingredients", "steps"):
+        mine = [textnorm.comparable(text) for text, _ in getattr(chosen, name)]
+        odd: set[str] = set()
+        for draft in drafts:
+            theirs = [textnorm.comparable(text) for text, _ in getattr(draft, name)]
+            if not theirs:
+                continue
+            if name == "ingredients":
+                odd |= {k for k in mine if k not in set(theirs)}
+            else:
+                joined = " ".join(theirs)
+                odd |= {k for k in mine if k not in joined}
+        if odd:
+            found[name] = sorted(odd)
+    return found
 
 
 def page_title_h1(html: str) -> str | None:

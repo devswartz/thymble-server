@@ -147,7 +147,9 @@ def test_device_html_import_saves_a_draft_recipe(env, member, household, sm):
     assert status["status"] == "done", status
     assert status["final_url"] == "https://example.test/lentil-soup"
     assert status["result"]["title"] == "Weeknight Lentil Soup"
-    assert status["needs_review"] is False
+    # The "or" line is a "check" item (D-034), so the draft waits for review.
+    assert status["needs_review"] is True
+    assert status["result"]["review"]["state"] == "needs_review"
 
     with sm() as session:
         recipe = session.get(Recipe, uuid.UUID(status["recipe_id"]))
