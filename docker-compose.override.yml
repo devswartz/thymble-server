@@ -37,3 +37,9 @@ services:
   redis:
     ports:
       - "127.0.0.1:${REDIS_PORT:-16379}:6379"
+
+  # Catches magic-link email locally (dev only): SMTP on mailpit:1025, web UI below.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "127.0.0.1:${MAILPIT_PORT:-8025}:8025"

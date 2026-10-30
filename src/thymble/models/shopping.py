@@ -80,6 +80,8 @@ class Trip(SyncedBase, Base):
     )
     expected_pickup_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Last "Got everything?" reminder sent for an unconfirmed order (D-030).
+    reminded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class ShoppingItem(SyncedBase, Base):

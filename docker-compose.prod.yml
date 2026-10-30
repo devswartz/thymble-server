@@ -1,0 +1,146 @@
+# Production overlay for a single host (e.g. a Proxmox LXC). Layer it on the base file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# or put COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml in .env and use plain
+# `docker compose ...`. Never combine it with docker-compose.override.yml (development).
+#
+# What it changes from the base file:
+#  - Public traffic arrives through a Cloudflare Tunnel (`cloudflared`, outbound only), so
+#    nothing publishes a host port: no api or PowerSync port, no Postgres, no Redis.
+#  - Data lives in bind mounts under THYMBLE_DATA_DIR (default /opt/thymble): postgres/,
+#    redis/, backups/, rclone/.
+#  - A `backup` service takes a nightly pg_dump (encrypted with age and copied off-site
+#    when configured). See docs/self-hosting.md.
+#  - Healthchecks everywhere, `restart: unless-stopped`, capped json-file logs.
+#
+# Migrations: the `migrate` one-shot service (base file) runs `alembic upgrade head` on every
+# `up`; api, worker and powersync start only after it succeeds.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  migrate:
+    logging: *logging
+
+  api:
+    # Reachable only on the compose network (cloudflared -> http://api:8000).
+    ports: !reset []
+    environment:
+      THYMBLE_ENV: production
+      # uvicorn --proxy-headers: trust X-Forwarded-For/-Proto from the tunnel. Safe because
+      # the api has no host port; only containers on this network can reach it.
+      FORWARDED_ALLOW_IPS: "*"
+      # Rate limits count real clients, not the tunnel (see thymble.ratelimit).
+      CLIENT_IP_HEADER: ${CLIENT_IP_HEADER:-CF-Connecting-IP}
+    logging: *logging
+
+  worker:
+    environment:
+      THYMBLE_ENV: production
+    healthcheck:
+      # arq refreshes a health key in Redis while the worker runs.
+      test: ["CMD", "arq", "--check", "thymble.worker.WorkerSettings"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+    logging: *logging
+
+  postgres:
+    volumes:
+      - ${THYMBLE_DATA_DIR:-/opt/thymble}/postgres:/var/lib/postgresql/data
+    shm_size: 256mb
+    logging: *logging
+
+  redis:
+    volumes:
+      - ${THYMBLE_DATA_DIR:-/opt/thymble}/redis:/data
+    logging: *logging
+
+  powersync:
+    # Reachable only on the compose network (cloudflared -> http://powersync:8080).
+    ports: !reset []
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8080/probes/liveness').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging: *logging
+
+  cloudflared:
+    # Thymble's own tunnel connector (D-020). The tunnel and its public hostnames are
+    # configured in the Cloudflare dashboard; this container only needs the token.
+    image: cloudflare/cloudflared:2026.10.0
+    command: ["tunnel", "--no-autoupdate", "run"]
+    # The tunnel token is read from a file, not .env, so it never reaches the app containers
+    # (they load all of .env). Readable by the image's user: chown 65532, chmod 0400.
+    secrets:
+      - cloudflared_token
+    environment:
+      TUNNEL_TOKEN_FILE: /run/secrets/cloudflared_token
+      # Metrics/readiness on loopback, for the healthcheck only.
+      TUNNEL_METRICS: 127.0.0.1:20241
+    healthcheck:
+      test: ["CMD", "cloudflared", "tunnel", "ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      api:
+        condition: service_healthy
+      powersync:
+        condition: service_started
+    restart: unless-stopped
+    logging: *logging
+
+  backup:
+    build:
+      context: deploy/backup
+    image: thymble-backup:local
+    command: ["schedule"]
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-thymble}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      PGDATABASE: ${POSTGRES_DB:-thymble}
+      TZ: ${TZ:-UTC}
+      BACKUP_AT: ${BACKUP_AT:-03:30}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_AGE_RECIPIENTS: ${BACKUP_AGE_RECIPIENTS:-}
+      BACKUP_REQUIRE_ENCRYPTION: ${BACKUP_REQUIRE_ENCRYPTION:-false}
+      BACKUP_RCLONE_REMOTE: ${BACKUP_RCLONE_REMOTE:-}
+      BACKUP_OFFSITE_KEEP_DAYS: ${BACKUP_OFFSITE_KEEP_DAYS:-30}
+      BACKUP_NOTIFY_URL: ${BACKUP_NOTIFY_URL:-}
+      BACKUP_NOTIFY_ON_SUCCESS: ${BACKUP_NOTIFY_ON_SUCCESS:-false}
+      BACKUP_VERIFY: ${BACKUP_VERIFY:-false}
+      RCLONE_CONFIG: /config/rclone/rclone.conf
+    volumes:
+      - ${THYMBLE_DATA_DIR:-/opt/thymble}/backups:/backups
+      # rclone.conf for the off-site remote (rclone may refresh tokens in it, so not :ro)
+      - ${THYMBLE_DATA_DIR:-/opt/thymble}/rclone:/config/rclone
+    healthcheck:
+      # Unhealthy when the last successful backup is more than 26 hours old.
+      test: ["CMD", "thymble-backup", "health"]
+      interval: 10m
+      timeout: 10s
+      retries: 1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *logging
+
+secrets:
+  cloudflared_token:
+    file: ${CLOUDFLARED_TOKEN_FILE:-/opt/thymble/secrets/cloudflared-token}

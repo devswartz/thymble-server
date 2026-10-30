@@ -1,9 +1,13 @@
 # What each device downloads. Everything is scoped to the households the signed-in
 # user belongs to (auth.user_id() is the JWT `sub`, i.e. app_user.id).
 #
-# Skeleton: only households, members, recipes and shopping items sync so far.
-# Server-only tables (connector_account, connector_item_link, llm_cache) must never
-# be added here: they hold credentials or cross-household data.
+# Rules (checked by tests/test_sync_config.py):
+# - Every query filters `deleted_at IS NULL`. Deletes are soft (the upload endpoint and
+#   the api set deleted_at); filtering here makes PowerSync drop the row from devices.
+# - Server-only tables are never listed: auth_* (sign-in secrets), household_invite
+#   (invite codes), import_job and llm_usage (raw imports, metering), llm_cache
+#   (cross-household), connector_account and connector_item_link (credentials, external
+#   ids), learning_event (append-only server log).
 config:
   edition: 3
 
@@ -16,13 +20,51 @@ streams:
   households:
     auto_subscribe: true
     queries:
-      - SELECT * FROM household WHERE id IN my_households
-      - SELECT * FROM household_member WHERE household_id IN my_households
+      - SELECT * FROM household WHERE id IN my_households AND deleted_at IS NULL
+      - SELECT * FROM household_member WHERE household_id IN my_households AND deleted_at IS NULL
 
+  # Recipes with their lines, steps and tags; imported drafts too (recipe.is_draft).
   recipes:
     auto_subscribe: true
-    query: SELECT * FROM recipe WHERE household_id IN my_households
+    queries:
+      - SELECT * FROM recipe WHERE household_id IN my_households AND deleted_at IS NULL
+      - SELECT * FROM recipe_ingredient WHERE household_id IN my_households AND deleted_at IS NULL
+      - SELECT * FROM recipe_step WHERE household_id IN my_households AND deleted_at IS NULL
+      - SELECT * FROM tag WHERE household_id IN my_households AND deleted_at IS NULL
+      - SELECT * FROM recipe_tag WHERE household_id IN my_households AND deleted_at IS NULL
 
+  planning:
+    auto_subscribe: true
+    query: SELECT * FROM meal_plan_entry WHERE household_id IN my_households AND deleted_at IS NULL
+
+  # The household's own catalog items and aliases (learned from imports and corrections).
+  catalog:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM ingredient WHERE household_id IN my_households AND deleted_at IS NULL
+      - SELECT * FROM ingredient_alias WHERE household_id IN my_households AND deleted_at IS NULL
+
+  # The global catalog (household_id NULL), shared by everyone.
+  global_catalog:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM ingredient WHERE household_id IS NULL AND deleted_at IS NULL
+      - SELECT * FROM ingredient_alias WHERE household_id IS NULL AND deleted_at IS NULL
+
+  # Shopping list, item provenance (for un-merging) and trips (§6.4).
   shopping:
     auto_subscribe: true
-    query: SELECT * FROM shopping_item WHERE household_id IN my_households
+    queries:
+      - SELECT * FROM shopping_item WHERE household_id IN my_households AND deleted_at IS NULL
+      - SELECT * FROM shopping_list WHERE household_id IN my_households AND deleted_at IS NULL
+      - SELECT * FROM shopping_item_source WHERE household_id IN my_households AND deleted_at IS NULL
+      - SELECT * FROM trip WHERE household_id IN my_households AND deleted_at IS NULL
+
+  # Stores, store groups and per-item store preferences (§6.4, D-027).
+  stores:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM store WHERE household_id IN my_households AND deleted_at IS NULL
+      - SELECT * FROM store_group WHERE household_id IN my_households AND deleted_at IS NULL
+      - SELECT * FROM store_group_member WHERE household_id IN my_households AND deleted_at IS NULL
+      - SELECT * FROM item_store_pref WHERE household_id IN my_households AND deleted_at IS NULL

@@ -7,7 +7,17 @@ import uuid
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import CheckConstraint, ForeignKey, Integer, Numeric, SmallInteger, String, Text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    ForeignKey,
+    Integer,
+    Numeric,
+    SmallInteger,
+    String,
+    Text,
+    false,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -19,6 +29,20 @@ class RecipeSourceType(enum.StrEnum):
     PHOTO = "photo"
     TEXT = "text"
     MANUAL = "manual"
+
+
+class ReviewState(enum.StrEnum):
+    """Import review (D-034): an import with anything not "high" (and every photo import)
+    starts in needs_review; POST /v1/imports/{id}/finalize moves it to reviewed."""
+
+    NEEDS_REVIEW = "needs_review"
+    REVIEWED = "reviewed"
+
+
+class ImportConfidence(enum.StrEnum):
+    HIGH = "high"
+    CHECK = "check"
+    LOW = "low"
 
 
 class Recipe(SyncedBase, Base):
@@ -44,6 +68,16 @@ class Recipe(SyncedBase, Base):
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("app_user.id", ondelete="SET NULL")
     )
+    # True while an imported recipe waits for the user's review (import pipeline §5.8).
+    is_draft: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
+    # Imported recipes only (NULL for recipes typed in): needs_review until every "low"
+    # item is confirmed or edited (D-034). Server-owned; read-only through sync.
+    review_state: Mapped[ReviewState | None] = mapped_column(
+        str_enum(ReviewState, "recipe_review_state")
+    )
+    # Section confidence (title, yield, times, groups, completeness) with reasons, the
+    # import's counts, and once reviewed who reviewed it and when.
+    review: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
 
 class RecipeIngredient(SyncedBase, Base):
@@ -66,6 +100,12 @@ class RecipeIngredient(SyncedBase, Base):
     preparation: Mapped[str | None] = mapped_column(Text)
     # Section heading, e.g. "For the sauce".
     group_name: Mapped[str | None] = mapped_column(Text)
+    # Import confidence (D-034); NULL for lines typed in. Details in `review`: reasons,
+    # reason codes, photo readings, and the review outcome. Server-owned.
+    confidence: Mapped[ImportConfidence | None] = mapped_column(
+        str_enum(ImportConfidence, "import_confidence")
+    )
+    review: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
 
 class RecipeStep(SyncedBase, Base):
@@ -79,6 +119,11 @@ class RecipeStep(SyncedBase, Base):
     group_name: Mapped[str | None] = mapped_column(Text)
     # Structured timers, e.g. [{"label": "bake", "seconds": 1500}].
     timers: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
+    # Import confidence and its details, as on recipe_ingredient.
+    confidence: Mapped[ImportConfidence | None] = mapped_column(
+        str_enum(ImportConfidence, "import_confidence")
+    )
+    review: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
 
 class Tag(SyncedBase, Base):

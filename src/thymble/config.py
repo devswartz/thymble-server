@@ -43,6 +43,31 @@ class Settings(BaseSettings):
     openai_compatible_base_url: str = ""
     openai_compatible_api_key: SecretStr = SecretStr("")
     local_model: str = ""
+    # LLM module (thymble.llm): models, per-task routing (LLM_ROUTE_T1..T8), guards.
+    anthropic_model_small: str = "claude-haiku-5-5"
+    anthropic_model_large: str = "claude-sonnet-5-5"
+    # Vision model for photo transcription on the local endpoint; empty = LOCAL_MODEL.
+    local_vision_model: str = ""
+    llm_route_t1: str = ""
+    llm_route_t2: str = ""
+    llm_route_t3: str = ""
+    llm_route_t4: str = ""
+    llm_route_t5: str = ""
+    llm_route_t6: str = ""
+    llm_route_t7: str = ""
+    llm_route_t8: str = ""
+    llm_timeout_seconds: float = 90.0
+    llm_local_timeout_seconds: float = 120.0
+    # Fall back to the other configured provider when the routed one fails or times out.
+    llm_fallback: bool = True
+    # Per-household monthly cap on uncached LLM tokens (input + output); 0 = no cap.
+    llm_household_monthly_token_limit: int = 0
+
+    # Recipe import (thymble.importer)
+    import_server_fetch_enabled: bool = True
+    import_fetch_timeout_seconds: float = 20.0
+    import_max_html_bytes: int = 5_000_000
+    import_max_photo_bytes: int = 10_000_000
 
     # Email sign-in (magic links)
     smtp_host: str = ""
@@ -50,6 +75,42 @@ class Settings(BaseSettings):
     smtp_username: str = ""
     smtp_password: SecretStr = SecretStr("")
     smtp_from: str = ""
+    # starttls (port 587), ssl (port 465) or none (local test servers such as Mailpit)
+    smtp_security: Literal["starttls", "ssl", "none"] = "starttls"
+
+    # Auth (architecture §9). Access tokens are HS256 JWTs signed with AUTH_JWT_SECRET.
+    auth_jwt_secret: SecretStr = SecretStr("")
+    access_token_ttl_seconds: int = 900
+    refresh_token_ttl_days: int = 60
+    powersync_token_ttl_seconds: int = 600
+    # Sign in with Apple: the app's bundle id (the identity token's audience).
+    # Comma-separated to also accept e.g. a Services ID. Empty turns Apple sign-in off.
+    apple_bundle_id: str = ""
+    # Where magic links point (a universal link the app opens); "?token=..." is appended.
+    # Defaults to THYMBLE_PUBLIC_URL + "/auth/email".
+    magic_link_url: str = ""
+    magic_link_ttl_minutes: int = 15
+    household_invite_ttl_hours: int = 168
+    # Refresh-token reuse grace: a refresh token presented again within this many seconds
+    # of its rotation (two devices or a retried request racing) gets the same new pair
+    # instead of tripping theft detection. 0 turns the grace off.
+    refresh_reuse_grace_seconds: int = Field(default=30, ge=0, le=300)
+
+    # Rate limits (thymble.ratelimit): "N/period" such as "5/hour" or "20/10min";
+    # "0" turns one rule off. Counters live in Redis (REDIS_URL) unless storage is
+    # "memory" (per process; single-process setups and tests).
+    rate_limit_enabled: bool = True
+    rate_limit_storage: Literal["redis", "memory"] = "redis"
+    rate_limit_magic_link_per_email: str = "5/hour"
+    rate_limit_magic_link_per_ip: str = "20/hour"
+    rate_limit_invite_join_per_user: str = "10/hour"
+    rate_limit_invite_join_per_ip: str = "30/hour"
+    # Header carrying the real client address when a proxy sits in front of the api
+    # (CF-Connecting-IP behind Cloudflare Tunnel). Empty: the connection's peer address.
+    client_ip_header: str = ""
+
+    # Encrypts connector credentials at rest (HA tokens, retailer OAuth tokens).
+    connector_encryption_key: SecretStr = SecretStr("")
 
     # Feature switches reported through /v1/capabilities
     photo_import_enabled: bool = True
@@ -62,6 +123,19 @@ class Settings(BaseSettings):
     def _split_commas(cls, value: object) -> object:
         if isinstance(value, str):
             return [part.strip() for part in value.split(",") if part.strip()]
+        return value
+
+    @field_validator(
+        "rate_limit_magic_link_per_email",
+        "rate_limit_magic_link_per_ip",
+        "rate_limit_invite_join_per_user",
+        "rate_limit_invite_join_per_ip",
+    )
+    @classmethod
+    def _check_limit(cls, value: str) -> str:
+        from thymble.ratelimit import parse_limit
+
+        parse_limit(value)
         return value
 
     @property
@@ -88,6 +162,10 @@ class Settings(BaseSettings):
     @property
     def email_sign_in(self) -> bool:
         return bool(self.smtp_host and self.smtp_from)
+
+    @property
+    def apple_audiences(self) -> list[str]:
+        return [part.strip() for part in self.apple_bundle_id.split(",") if part.strip()]
 
 
 def normalize_db_url(url: str) -> str:

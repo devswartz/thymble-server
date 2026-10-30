@@ -21,6 +21,11 @@ OVERRIDES = {
     "LOG_LEVEL": "debug",
     "THYMBLE_PUBLIC_URL": "http://localhost:8000",
     "POWERSYNC_URL": "http://localhost:8080",
+    # Magic-link email goes to the Mailpit container from docker-compose.override.yml
+    # (web UI on http://localhost:8025).
+    "SMTP_HOST": "mailpit",
+    "SMTP_PORT": "1025",
+    "SMTP_SECURITY": "none",
 }
 
 
