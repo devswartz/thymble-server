@@ -46,7 +46,7 @@ class ParsedLine:
     note: str | None = None
     optional: bool = False
     # Lowest field confidence from ingredient-parser-nlp (1.0 for ditto copies).
-    parser_confidence: float = 0.0
+    parse_score: float = 0.0
     flags: list[str] = field(default_factory=list)
     ditto: bool = False
     group: str | None = None
@@ -77,6 +77,8 @@ class ParsedLine:
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["needs_review"] = self.needs_review
+        # Photo imports: the device's OCR line matched to this one (D-035).
+        data["device_reading"] = (self.readings or {}).get("device")
         return data
 
 
@@ -147,7 +149,7 @@ def _from_ditto(text: str, lang: str, prev: ParsedLine, group: str | None) -> Pa
         return None
     out = ParsedLine(**{**asdict(prev), "raw_text": text, "text": text, "group": group})
     out.additional, out.alternatives = list(prev.additional), list(prev.alternatives)
-    out.ditto, out.parser_confidence, out.flags, out.review_reasons = True, 1.0, [], []
+    out.ditto, out.parse_score, out.flags, out.review_reasons = True, 1.0, [], []
     out.source, out.ingredient_id, out.ingredient_name = "rules", None, None
     if kind == "qty":
         amount = parse_line(f"{arg} x", lang)
@@ -296,7 +298,7 @@ def parse_line(
         preparation=prep,
         note="; ".join(notes) or None,
         optional=bool(re.search(r"\boptional\b", low)),
-        parser_confidence=round(confidence, 4),
+        parse_score=round(confidence, 4),
         flags=flags,
         group=group,
     )

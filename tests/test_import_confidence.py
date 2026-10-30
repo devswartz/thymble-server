@@ -41,7 +41,7 @@ def pipeline(provider: FakeProvider | None = None, transport=None) -> ImportPipe
 
 def line(**kw) -> ParsedLine:
     base = {"raw_text": "1 cup sugar", "text": "1 cup sugar", "quantity": 1.0, "unit": "cup"}
-    base.update({"name": "sugar", "parser_confidence": 0.99})
+    base.update({"name": "sugar", "parse_score": 0.99})
     base.update(kw)
     return ParsedLine(**base)
 
@@ -124,8 +124,8 @@ def test_clean_line_is_high():
 @pytest.mark.parametrize(
     ("kw", "code", "level"),
     [
-        ({"parser_confidence": 0.85}, "parser_unsure", Level.CHECK),
-        ({"parser_confidence": 0.3}, "parser_very_unsure", Level.LOW),
+        ({"parse_score": 0.85}, "parser_unsure", Level.CHECK),
+        ({"parse_score": 0.3}, "parser_very_unsure", Level.LOW),
         ({"name": None}, "no_name", Level.LOW),
         ({"source": "llm"}, "llm_parsed", Level.CHECK),
         ({"ditto": True}, "ditto_copied", Level.CHECK),
@@ -148,7 +148,7 @@ def test_line_reasons(kw, code, level):
 
 def test_llm_answer_never_raises_confidence():
     # The parser was very unsure; the LLM answered. Still not high.
-    a = assess_line(line(parser_confidence=0.3, source="llm"))
+    a = assess_line(line(parse_score=0.3, source="llm"))
     assert a.level == Level.CHECK
     assert {"parser_unsure", "llm_parsed"} <= set(a.codes)
 
@@ -265,8 +265,13 @@ def test_device_html_import_scores_every_item():
     review = result["review"]
     assert review["state"] == "needs_review" and result["needs_review"] is True
     assert review["counts"]["check"] == 1 and review["counts"]["low"] == 0
-    assert set(review["sections"]) == {"title", "yield", "times", "groups", "completeness"}
-    assert review["sections"]["groups"]["names"] == ["Simmer", "Start the soup"]
+    sections = {s["field"]: s for s in result["sections"]}
+    assert list(sections) == ["title", "yield", "times", "groups"]
+    assert sections["title"]["value"] == "Weeknight Lentil Soup"
+    assert sections["groups"]["value"] == ["Simmer", "Start the soup"]
+    assert sections["times"]["value"]["total_minutes"] == 55
+    assert review["completeness"]["confidence"] == "high"
+    assert by_text["1 tsp ground cumin"]["device_reading"] is None
 
 
 def test_all_high_text_import_needs_no_review():

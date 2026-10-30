@@ -247,9 +247,9 @@ def assess_line(
     if not line.name:
         a.add("no_name")
     if not line.ditto:
-        if line.parser_confidence < PARSER_LOW_BELOW and line.source != "llm":
+        if line.parse_score < PARSER_LOW_BELOW and line.source != "llm":
             a.add("parser_very_unsure")
-        elif line.parser_confidence < PARSER_CHECK_BELOW:
+        elif line.parse_score < PARSER_CHECK_BELOW:
             a.add("parser_unsure")
     if line.source == "llm":
         a.add("llm_parsed")

@@ -81,6 +81,28 @@ class ImportOutcome:
     def needs_review(self) -> bool:
         return self.review_state == "needs_review"
 
+    def section_values(self) -> dict[str, Any]:
+        d = self.draft
+        return {
+            "title": d.title,
+            "yield": self.yield_info.get("text"),
+            "times": {
+                "prep_minutes": d.prep_time_minutes,
+                "cook_minutes": d.cook_time_minutes,
+                "total_minutes": d.total_time_minutes,
+            },
+            "groups": (self.sections.get("groups") or {}).get("names") or [],
+        }
+
+    def section_list(self) -> list[dict[str, Any]]:
+        """[{"field", "value", "confidence", "reasons", ...}] for title, yield, times, groups."""
+        values = self.section_values()
+        out = []
+        for name in ("title", "yield", "times", "groups"):
+            data = {k: v for k, v in (self.sections.get(name) or {}).items() if k != "names"}
+            out.append({"field": name, "value": values[name], **data})
+        return out
+
     def to_result(self) -> dict[str, Any]:
         d = self.draft
         return {
@@ -110,10 +132,12 @@ class ImportOutcome:
             "stages": self.stages,
             "needs_review": self.needs_review,
             "review_reasons": self.review_reasons,
+            "sections": self.section_list(),
             "review": {
                 "state": self.review_state,
                 "counts": self.confidence_counts,
-                "sections": self.sections,
+                # Not a field the user edits: missing steps, lines only the phone read.
+                "completeness": self.sections.get("completeness"),
             },
         }
 
@@ -350,7 +374,7 @@ def _expand_additional(lines: list[ParsedLine]) -> list[ParsedLine]:
                     name=name,
                     note=line.note,
                     optional=line.optional,
-                    parser_confidence=line.parser_confidence,
+                    parse_score=line.parse_score,
                     group=line.group,
                     source=line.source,
                 )
