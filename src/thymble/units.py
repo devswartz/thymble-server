@@ -8,10 +8,12 @@ parser, an LLM answer, a voice entry or the REST api.
 
 Conversions need no ingredient knowledge: volume <-> volume, mass <-> mass and
 length <-> length. Volume <-> mass (density) is deliberately left out. Everything else
-("clove", "can", "bunch") only adds up with exactly the same unit. `ct` is a bare count
-("each", "pieces"); it is left out of display text ("3 eggs", not "3 ct eggs").
+("clove", "can", "bunch") only adds up with exactly the same unit. `piece` is a bare
+count ("each", "ct", "pieces"); it is left out of display text ("3 eggs", not
+"3 piece eggs").
 
-Codes are lower-case ASCII without spaces: `fl_oz`, not "fl oz". Unknown units pass
+Codes are the importer's (and ThymbleKit's): lower-case ASCII, "fl oz" with a space,
+"pt", "qt", "piece", "package". Underscores read as spaces. Unknown units pass
 through `normalize()` cleaned up (lower-case, singular), so nothing a user wrote is lost.
 """
 
@@ -40,10 +42,10 @@ _TABLE: tuple[Unit, ...] = (
     Unit("tsp", "volume", Decimal("4.92892"), ("teaspoon", "tsps", "t")),
     Unit("tbsp", "volume", Decimal("14.7868"), ("tablespoon", "tbsps", "tbs", "tbl", "tbls")),
     Unit(
-        "fl_oz",
+        "fl oz",
         "volume",
         Decimal("29.5735"),
-        ("fl oz", "fl. oz", "fl.oz", "floz", "fluid ounce", "fluid oz"),
+        ("fl. oz", "fl.oz", "floz", "fluid ounce", "fluid oz"),
     ),
     Unit("cup", "volume", Decimal("236.588"), ("c", "cups")),
     Unit("pt", "volume", Decimal("473.176"), ("pint", "pts")),
@@ -59,7 +61,7 @@ _TABLE: tuple[Unit, ...] = (
     Unit("cm", "length", Decimal("1"), ("centimeter", "centimetre")),
     Unit("inch", "length", Decimal("2.54"), ("inches",)),
     # a bare count
-    Unit("ct", "count", Decimal("1"), ("each", "count", "piece", "pc", "pcs")),
+    Unit("piece", "count", Decimal("1"), ("each", "count", "ct", "pc", "pcs")),
     # only add up with themselves
     Unit("can", aliases=("tin",)),
     Unit("clove"),
@@ -68,7 +70,7 @@ _TABLE: tuple[Unit, ...] = (
     Unit("pinch", aliases=("pinches",)),
     Unit("dash", aliases=("dashes",)),
     Unit("bunch", aliases=("bunches",)),
-    Unit("package", aliases=("packet", "pkg")),
+    Unit("package", aliases=("pack", "packet", "pkg")),
     Unit("slice"),
     Unit("sprig"),
     Unit("drop"),
@@ -181,6 +183,6 @@ def format_quantity(quantity: Decimal | None, unit: str | None) -> str:
     q = quantity.quantize(QUANTUM).normalize()
     text = f"{q:f}"
     u = normalize(unit)
-    if u and u != "ct":
-        text += f" {u.replace('_', ' ')}"
+    if u and u != "piece":
+        text += f" {u}"
     return text

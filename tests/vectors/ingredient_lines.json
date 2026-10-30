@@ -404,7 +404,7 @@
       "expect": {
         "quantity": 8,
         "quantity_max": null,
-        "unit": "fl_oz",
+        "unit": "fl oz",
         "additional": [],
         "alternatives": [],
         "preparation": null,
@@ -462,13 +462,53 @@
       "expect": {
         "quantity": 3,
         "quantity_max": null,
-        "unit": "ct",
+        "unit": "piece",
         "additional": [],
         "alternatives": [],
         "preparation": null,
         "optional": false,
         "ditto": false,
         "name": "crystallized ginger"
+      }
+    },
+    {
+      "id": "U13",
+      "kind": "recipe_line",
+      "tags": [
+        "unit-alias",
+        "package"
+      ],
+      "input": "2 packs dry yeast",
+      "expect": {
+        "quantity": 2,
+        "quantity_max": null,
+        "unit": "package",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "dry yeast"
+      }
+    },
+    {
+      "id": "U14",
+      "kind": "recipe_line",
+      "tags": [
+        "unit-alias",
+        "count"
+      ],
+      "input": "1 piece fresh ginger",
+      "expect": {
+        "quantity": 1,
+        "quantity_max": null,
+        "unit": "piece",
+        "additional": [],
+        "alternatives": [],
+        "preparation": null,
+        "optional": false,
+        "ditto": false,
+        "name": "fresh ginger"
       }
     },
     {
@@ -1410,6 +1450,58 @@
         "store": null,
         "is_food": true,
         "name": "ice cream"
+      }
+    },
+    {
+      "id": "V21",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "unit"
+      ],
+      "input": "2 packs batteries",
+      "expect": {
+        "quantity": 2,
+        "unit": "package",
+        "urgent": false,
+        "store": null,
+        "is_food": false,
+        "name": "batteries"
+      }
+    },
+    {
+      "id": "V22",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "unit"
+      ],
+      "input": "4 pieces salmon",
+      "expect": {
+        "quantity": 4,
+        "unit": "piece",
+        "urgent": false,
+        "store": null,
+        "is_food": true,
+        "name": "salmon"
+      }
+    },
+    {
+      "id": "V23",
+      "kind": "voice_item",
+      "tags": [
+        "voice",
+        "urgent",
+        "apostrophe"
+      ],
+      "input": "we’re out of milk",
+      "expect": {
+        "quantity": null,
+        "unit": null,
+        "urgent": true,
+        "store": null,
+        "is_food": true,
+        "name": "milk"
       }
     }
   ]

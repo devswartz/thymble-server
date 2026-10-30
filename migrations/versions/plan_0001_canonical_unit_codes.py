@@ -1,15 +1,16 @@
 """units: one set of unit codes for recipes and the shopping list
 
-The importer and the shopping list used to write different codes for the same unit
-(recipe lines "fl oz" / "piece", list items "pint" / "quart"). Both now use the table in
-`thymble.units`; this rewrites stored rows to its codes. Also maps spellings the old
-shopping normalizer stored as-is ("tin", "packet", "boxe") to their codes.
+The importer and the shopping list used to write different codes for the same unit.
+Both now use the table in `thymble.units`, whose codes are the importer's (and
+ThymbleKit's): "fl oz", "pt", "qt", "piece", "package". This rewrites the shopping list's
+old codes ("fl_oz", "pint", "quart", "ct", "pack") and spellings the old shopping
+normalizer stored as-is ("tin", "packet", "boxe").
 
 Columns: recipe_ingredient.unit, shopping_item.unit, shopping_item_source.unit,
 item_store_pref.typical_unit. Data only, no schema change.
 
-Downgrade restores the old codes each writer used (recipe lines "fl oz" / "piece", list
-rows "pint" / "quart"); the extra spellings stay mapped.
+Downgrade puts the shopping list's old codes back ("fl_oz", "pint", "quart", "ct"); the
+extra spellings stay mapped.
 
 Revision ID: plan_0001
 Revises: shop_0001
@@ -28,11 +29,12 @@ depends_on: str | Sequence[str] | None = None
 
 # Frozen here on purpose: migrations must not change when thymble.units does.
 OLD_TO_NEW = {
-    "fl oz": "fl_oz",
-    "fluid ounce": "fl_oz",
+    "fl_oz": "fl oz",
+    "fluid ounce": "fl oz",
     "pint": "pt",
     "quart": "qt",
-    "piece": "ct",
+    "ct": "piece",
+    "pack": "package",
     "tin": "can",
     "packet": "package",
     "pkg": "package",
@@ -57,8 +59,8 @@ COLUMNS = (
 )
 
 # What each writer used before, for downgrade.
-RECIPE_OLD = {"fl_oz": "fl oz", "ct": "piece"}
-SHOPPING_OLD = {"pt": "pint", "qt": "quart"}
+RECIPE_OLD: dict[str, str] = {}  # recipe lines already used these codes
+SHOPPING_OLD = {"fl oz": "fl_oz", "pt": "pint", "qt": "quart", "piece": "ct"}
 
 
 def _rewrite(table: str, column: str, mapping: dict[str, str]) -> None:

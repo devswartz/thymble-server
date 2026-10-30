@@ -100,7 +100,7 @@ def test_list_item_flow(api):
         "typical_unit": "each",
     }
     pref = ok(api.put("/v1/item-prefs", json=pref_in))
-    assert pref["preferred_brand"] == "Charmin" and pref["typical_unit"] == "ct"
+    assert pref["preferred_brand"] == "Charmin" and pref["typical_unit"] == "piece"
     home = ok(api.put(f"/v1/item-prefs/{tp['item']['ingredient_id']}/home",
                       json={"store_id": aldi["id"]}))  # fmt: skip
     assert home["is_home"] and home["id"] == pref["id"]

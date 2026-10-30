@@ -133,7 +133,14 @@ def test_plan_0001_rewrites_unit_codes(db_url):
     engine = create_engine(db_url)
     ids = {name: uuid.uuid4() for name in ("hh", "recipe", "list", "ing", "group")}
     lines = {"fl oz": uuid.uuid4(), "piece": uuid.uuid4(), "cup": uuid.uuid4()}
-    items = {"pint": uuid.uuid4(), "quart": uuid.uuid4(), "boxe": uuid.uuid4()}
+    items = {
+        "pint": uuid.uuid4(),
+        "quart": uuid.uuid4(),
+        "fl_oz": uuid.uuid4(),
+        "ct": uuid.uuid4(),
+        "pack": uuid.uuid4(),
+        "boxe": uuid.uuid4(),
+    }
 
     def units(table: str, column: str = "unit") -> dict[uuid.UUID, str]:
         with engine.connect() as conn:
@@ -197,12 +204,16 @@ def test_plan_0001_rewrites_unit_codes(db_url):
             )
 
         command.upgrade(cfg, "plan_0001")
-        assert units("recipe_ingredient") == {
-            lines["fl oz"]: "fl_oz",
-            lines["piece"]: "ct",
-            lines["cup"]: "cup",
+        # Recipe lines already used the canonical (importer) codes.
+        assert units("recipe_ingredient") == {line_id: u for u, line_id in lines.items()}
+        expected_items = {
+            items["pint"]: "pt",
+            items["quart"]: "qt",
+            items["fl_oz"]: "fl oz",
+            items["ct"]: "piece",
+            items["pack"]: "package",
+            items["boxe"]: "box",
         }
-        expected_items = {items["pint"]: "pt", items["quart"]: "qt", items["boxe"]: "box"}
         assert units("shopping_item") == expected_items
         assert units("shopping_item_source") == expected_items
         assert units("item_store_pref", "typical_unit") == {ids["ing"]: "qt"}
@@ -211,6 +222,8 @@ def test_plan_0001_rewrites_unit_codes(db_url):
         assert units("recipe_ingredient")[lines["fl oz"]] == "fl oz"
         assert units("recipe_ingredient")[lines["piece"]] == "piece"
         assert units("shopping_item")[items["pint"]] == "pint"
+        assert units("shopping_item")[items["fl_oz"]] == "fl_oz"
+        assert units("shopping_item")[items["ct"]] == "ct"
         assert units("item_store_pref", "typical_unit") == {ids["ing"]: "quart"}
     finally:
         engine.dispose()

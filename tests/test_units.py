@@ -14,18 +14,18 @@ from thymble.shopping.text import parse_entry
 @pytest.mark.parametrize(
     ("raw", "code"),
     [
-        ("fl oz", "fl_oz"),
-        ("fl. oz.", "fl_oz"),
-        ("fluid ounces", "fl_oz"),
-        ("fluid_ounce", "fl_oz"),  # the ingredient parser's pint unit name
-        ("FL_OZ", "fl_oz"),
+        ("fl oz", "fl oz"),
+        ("fl. oz.", "fl oz"),
+        ("fluid ounces", "fl oz"),
+        ("fluid_ounce", "fl oz"),  # the ingredient parser's pint unit name
+        ("FL_OZ", "fl oz"),
         ("pint", "pt"),
         ("pints", "pt"),
         ("qt", "qt"),
         ("Quarts", "qt"),
         ("gallons", "gal"),
-        ("piece", "ct"),
-        ("each", "ct"),
+        ("piece", "piece"),
+        ("each", "piece"),
         ("T", "tbsp"),
         ("t", "tsp"),
         ("Tbsps.", "tbsp"),
@@ -34,6 +34,7 @@ from thymble.shopping.text import parse_entry
         ("centilitres", "cl"),
         ("tins", "can"),
         ("packets", "package"),
+        ("packs", "package"),
         ("bunches", "bunch"),
         ("boxes", "box"),
         ("inches", "inch"),
@@ -51,7 +52,7 @@ def test_normalize(raw, code):
 def test_every_code_and_alias_maps_into_the_table():
     assert set(units.ALIASES.values()) == set(units.UNITS)
     for code in units.UNITS:
-        assert code == code.lower() and " " not in code
+        assert code == code.lower() and code == " ".join(code.split())
         assert units.normalize(code) == code
 
 
@@ -66,13 +67,13 @@ def test_importer_and_shopping_agree():
 
 
 def test_compatible_and_convert():
-    assert units.compatible("fl_oz", "cup") and units.compatible("pt", "qt")
-    assert units.compatible("inch", "cm") and units.compatible("ct", "each")
+    assert units.compatible("fl oz", "cup") and units.compatible("pt", "qt")
+    assert units.compatible("inch", "cm") and units.compatible("ct", "piece")
     assert not units.compatible("cup", "g")  # no density
     assert not units.compatible("can", "jar") and units.compatible("cans", "can")
-    assert not units.compatible("ct", None)
+    assert not units.compatible("piece", None)
     assert units.convert(Decimal(2), "pt", "qt") == Decimal("1.0000")
-    assert units.convert(Decimal(16), "fl_oz", "pt") == Decimal("1.0000")
+    assert units.convert(Decimal(16), "fl oz", "pt") == Decimal("1.0000")
     assert units.convert(Decimal(1), "dl", "ml") == Decimal("100.0000")
     assert units.convert(Decimal(1), "cup", "g") is None
 
@@ -89,7 +90,7 @@ def test_merge_follows_the_list_rule():
 
 
 def test_format_quantity():
-    assert units.format_quantity(Decimal("8"), "fl_oz") == "8 fl oz"
-    assert units.format_quantity(Decimal("6"), "ct") == "6"
+    assert units.format_quantity(Decimal("8"), "fl oz") == "8 fl oz"
+    assert units.format_quantity(Decimal("6"), "each") == "6"
     assert units.format_quantity(Decimal("1.50"), "pints") == "1.5 pt"
     assert units.format_quantity(None, "cup") == ""
