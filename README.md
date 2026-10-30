@@ -130,7 +130,7 @@ Both return the api's own tokens: a short-lived access token (HS256 JWT signed w
 
 **Sync writes.** `POST /v1/sync/upload` takes the PowerSync upload queue (`{"batch": [{"op": "PUT"|"PATCH"|"DELETE", "table", "id", "opData"}]}`) and applies it in one transaction: each row must belong to one of the user's households, rows can't move between households, foreign keys must point into the same household, and only registered tables and columns are accepted (`GET /v1/sync/tables` lists them). Writable: recipes (lines, steps, tags), the meal plan, shopping lists, items and item sources, trips, stores, store groups and item preferences. Columns with server logic behind them stay with the REST endpoints: trip status and order export (`trip_id`), stop-gap links (`bridge_of`), a store's external list, connector provenance. DELETE is a soft delete. A 4xx names the failing entry and nothing is written; the client should report and drop that batch rather than retry it. New features make their tables writable with `thymble.sync.register(SyncTable(Model, ...))`; see `src/thymble/sync/registry.py`.
 
-Alexa account linking will need an OAuth2 authorization-code endpoint; tokens already carry a `client_id` so it can reuse the same token machinery (see `src/thymble/auth/__init__.py`).
+Alexa account linking will need an OAuth2 authorization-code endpoint; tokens already carry a `client_id` so it can reuse the same token machinery. The design (endpoints, flow, storage, scopes) is in [docs/oauth-account-linking.md](docs/oauth-account-linking.md); nothing of it is implemented yet.
 
 ## Contributing
 See [CONTRIBUTING.md](CONTRIBUTING.md). Contributions are signed off under the [Developer Certificate of Origin](https://developercertificate.org/).
