@@ -1057,6 +1057,14 @@
                   "photo": {
                     "type": "string",
                     "format": "binary"
+                  },
+                  "device_ocr_text": {
+                    "type": "string",
+                    "description": "The device's own OCR of the photo (D-035)"
+                  },
+                  "device_ocr_confidences": {
+                    "type": "string",
+                    "description": "JSON array: one 0..1 confidence per line of device_ocr_text"
                   }
                 },
                 "required": [
@@ -1120,6 +1128,928 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/imports/{import_id}/finalize": {
+      "post": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Finalize Import",
+        "operationId": "finalize_import_v1_imports__import_id__finalize_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Import Id"
+            }
+          },
+          {
+            "name": "x-thymble-household",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Household the request acts on (UUID)",
+              "title": "X-Thymble-Household"
+            },
+            "description": "Household the request acts on (UUID)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinalizeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportStatusOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/recipes": {
+      "get": {
+        "tags": [
+          "recipes"
+        ],
+        "summary": "List Recipes",
+        "description": "The household's recipes by title. `q` matches every word in the title; `tag` keeps\nrecipes with that tag.",
+        "operationId": "list_recipes_v1_recipes_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Words in the title",
+              "title": "Q"
+            },
+            "description": "Words in the title"
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Tag name (any case)",
+              "title": "Tag"
+            },
+            "description": "Tag name (any case)"
+          },
+          {
+            "name": "draft",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only drafts, or only reviewed",
+              "title": "Draft"
+            },
+            "description": "Only drafts, or only reviewed"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "x-thymble-household",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Household the request acts on (UUID)",
+              "title": "X-Thymble-Household"
+            },
+            "description": "Household the request acts on (UUID)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RecipeSummary"
+                  },
+                  "title": "Response List Recipes V1 Recipes Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "recipes"
+        ],
+        "summary": "Create Recipe",
+        "description": "A recipe typed in by hand (imports go through /v1/imports).",
+        "operationId": "create_recipe_v1_recipes_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-thymble-household",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Household the request acts on (UUID)",
+              "title": "X-Thymble-Household"
+            },
+            "description": "Household the request acts on (UUID)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/thymble__api__recipes__RecipeIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/recipes/{recipe_id}": {
+      "get": {
+        "tags": [
+          "recipes"
+        ],
+        "summary": "Get Recipe",
+        "description": "The recipe with its ingredient lines, steps and tags. With `servings`, each line also\ncarries `scaled_quantity` for that many servings (scaled from the recipe's yield; a\nrecipe without a numeric yield isn't scaled and reports `scale` 1).",
+        "operationId": "get_recipe_v1_recipes__recipe_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "recipe_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Recipe Id"
+            }
+          },
+          {
+            "name": "servings",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 10000.0,
+                  "exclusiveMinimum": 0.0
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Scale the lines to this many servings",
+              "title": "Servings"
+            },
+            "description": "Scale the lines to this many servings"
+          },
+          {
+            "name": "x-thymble-household",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Household the request acts on (UUID)",
+              "title": "X-Thymble-Household"
+            },
+            "description": "Household the request acts on (UUID)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "recipes"
+        ],
+        "summary": "Update Recipe",
+        "operationId": "update_recipe_v1_recipes__recipe_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "recipe_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Recipe Id"
+            }
+          },
+          {
+            "name": "x-thymble-household",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Household the request acts on (UUID)",
+              "title": "X-Thymble-Household"
+            },
+            "description": "Household the request acts on (UUID)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecipePatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "recipes"
+        ],
+        "summary": "Delete Recipe",
+        "description": "Soft delete, with its lines, steps and tag links (so devices drop them too). Plan\nentries that use it stay; they list it under `other_entries` in the plan expansion.",
+        "operationId": "delete_recipe_v1_recipes__recipe_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "recipe_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Recipe Id"
+            }
+          },
+          {
+            "name": "x-thymble-household",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Household the request acts on (UUID)",
+              "title": "X-Thymble-Household"
+            },
+            "description": "Household the request acts on (UUID)"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/meal-plan": {
+      "get": {
+        "tags": [
+          "meal plan"
+        ],
+        "summary": "List Entries",
+        "description": "Entries from `start` to `end` (inclusive), by date and slot.",
+        "operationId": "list_entries_v1_meal_plan_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "End"
+            }
+          },
+          {
+            "name": "x-thymble-household",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Household the request acts on (UUID)",
+              "title": "X-Thymble-Household"
+            },
+            "description": "Household the request acts on (UUID)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EntryOut"
+                  },
+                  "title": "Response List Entries V1 Meal Plan Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "meal plan"
+        ],
+        "summary": "Create Entry",
+        "operationId": "create_entry_v1_meal_plan_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-thymble-household",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Household the request acts on (UUID)",
+              "title": "X-Thymble-Household"
+            },
+            "description": "Household the request acts on (UUID)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntryIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntryOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/meal-plan/ingredients": {
+      "get": {
+        "tags": [
+          "meal plan"
+        ],
+        "summary": "Plan Ingredients",
+        "description": "The plan's ingredients for a date range: scaled to each entry's servings, merged by\ningredient and compatible unit (as on the shopping list), with every recipe's share.\nIncompatible units (cups vs grams) stay separate lines. Nothing is written.",
+        "operationId": "plan_ingredients_v1_meal_plan_ingredients_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "End"
+            }
+          },
+          {
+            "name": "x-thymble-household",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Household the request acts on (UUID)",
+              "title": "X-Thymble-Household"
+            },
+            "description": "Household the request acts on (UUID)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpansionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/meal-plan/{entry_id}": {
+      "get": {
+        "tags": [
+          "meal plan"
+        ],
+        "summary": "Get Entry",
+        "operationId": "get_entry_v1_meal_plan__entry_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Entry Id"
+            }
+          },
+          {
+            "name": "x-thymble-household",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Household the request acts on (UUID)",
+              "title": "X-Thymble-Household"
+            },
+            "description": "Household the request acts on (UUID)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntryOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "meal plan"
+        ],
+        "summary": "Update Entry",
+        "description": "Change an entry. A changed servings count or recipe does not change shopping lists\nthe entry was already added to (re-add it there to update them).",
+        "operationId": "update_entry_v1_meal_plan__entry_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Entry Id"
+            }
+          },
+          {
+            "name": "x-thymble-household",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Household the request acts on (UUID)",
+              "title": "X-Thymble-Household"
+            },
+            "description": "Household the request acts on (UUID)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntryPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntryOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "meal plan"
+        ],
+        "summary": "Delete Entry",
+        "description": "Soft delete. The entry's share comes off any shopping list it was added to (items\nalready bought or on order are left alone).",
+        "operationId": "delete_entry_v1_meal_plan__entry_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Entry Id"
+            }
+          },
+          {
+            "name": "x-thymble-household",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Household the request acts on (UUID)",
+              "title": "X-Thymble-Household"
+            },
+            "description": "Household the request acts on (UUID)"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -2108,7 +3038,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RecipeIn"
+                "$ref": "#/components/schemas/thymble__api__shopping_schemas__RecipeIn"
               }
             }
           }
@@ -4562,6 +5492,298 @@
         ],
         "title": "EmailSignInVerify"
       },
+      "EntryIn": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "meal_slot": {
+            "$ref": "#/components/schemas/MealSlot"
+          },
+          "recipe_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recipe Id"
+          },
+          "free_text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Text"
+          },
+          "servings": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Servings"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "meal_slot"
+        ],
+        "title": "EntryIn",
+        "description": "A recipe or a free-text meal (\"leftovers\", \"eat out\") on a day and slot."
+      },
+      "EntryOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "meal_slot": {
+            "$ref": "#/components/schemas/MealSlot"
+          },
+          "recipe_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recipe Id"
+          },
+          "recipe_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recipe Title"
+          },
+          "free_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Text"
+          },
+          "servings": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Servings"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "date",
+          "meal_slot",
+          "recipe_id",
+          "free_text",
+          "servings",
+          "notes",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "EntryOut"
+      },
+      "EntryPatch": {
+        "properties": {
+          "date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "meal_slot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealSlot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recipe_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recipe Id"
+          },
+          "free_text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Text"
+          },
+          "servings": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Servings"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "title": "EntryPatch",
+        "description": "Only the fields sent change; send null to clear recipe_id, free_text, servings or\nnotes (an entry must keep a recipe or free text)."
+      },
+      "ExpansionOut": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/LineOut"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "other_entries": {
+            "items": {
+              "$ref": "#/components/schemas/EntryOut"
+            },
+            "type": "array",
+            "title": "Other Entries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "lines",
+          "other_entries"
+        ],
+        "title": "ExpansionOut"
+      },
       "ExportIn": {
         "properties": {
           "item_ids": {
@@ -4695,6 +5917,21 @@
           "lines"
         ],
         "title": "ExportOut"
+      },
+      "FinalizeRequest": {
+        "properties": {
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewDecision"
+            },
+            "type": "array",
+            "title": "Decisions",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FinalizeRequest"
       },
       "GroupIn": {
         "properties": {
@@ -4971,6 +6208,18 @@
             ],
             "title": "Error"
           },
+          "review": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review"
+          },
           "result": {
             "anyOf": [
               {
@@ -5011,11 +6260,342 @@
           "recipe_id",
           "needs_review",
           "error",
+          "review",
           "result",
           "created_at",
           "finished_at"
         ],
         "title": "ImportStatusOut"
+      },
+      "IngredientEdit": {
+        "properties": {
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "quantity_max": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity Max"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "additional": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Additional",
+            "default": []
+          },
+          "alternatives": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Alternatives",
+            "default": []
+          },
+          "preparation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preparation"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "optional": {
+            "type": "boolean",
+            "title": "Optional",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "IngredientEdit"
+      },
+      "IngredientLineIn": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "raw_text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Raw Text"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "quantity_max": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity Max"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "ingredient_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingredient Id"
+          },
+          "preparation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preparation"
+          },
+          "group_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "raw_text"
+        ],
+        "title": "IngredientLineIn",
+        "description": "One ingredient line. Send `id` to keep an existing line; lines left out are removed."
+      },
+      "IngredientLineOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "raw_text": {
+            "type": "string",
+            "title": "Raw Text"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "quantity_max": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity Max"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "ingredient_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingredient Id"
+          },
+          "ingredient_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingredient Name"
+          },
+          "preparation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preparation"
+          },
+          "group_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Name"
+          },
+          "scaled_quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scaled Quantity"
+          },
+          "scaled_quantity_max": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scaled Quantity Max"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "position",
+          "raw_text",
+          "quantity",
+          "quantity_max",
+          "unit",
+          "ingredient_id",
+          "preparation",
+          "group_name"
+        ],
+        "title": "IngredientLineOut"
       },
       "InviteOut": {
         "properties": {
@@ -5477,6 +7057,69 @@
         ],
         "title": "JoinRequest"
       },
+      "LineOut": {
+        "properties": {
+          "ingredient_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingredient Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceOut"
+            },
+            "type": "array",
+            "title": "Sources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ingredient_id",
+          "name",
+          "quantity",
+          "unit",
+          "text",
+          "sources"
+        ],
+        "title": "LineOut"
+      },
       "ListIn": {
         "properties": {
           "name": {
@@ -5678,6 +7321,16 @@
         },
         "type": "object",
         "title": "MealPlanIn"
+      },
+      "MealSlot": {
+        "type": "string",
+        "enum": [
+          "breakfast",
+          "lunch",
+          "dinner",
+          "snack"
+        ],
+        "title": "MealSlot"
       },
       "MemberOut": {
         "properties": {
@@ -5968,18 +7621,193 @@
         ],
         "title": "PrefOut"
       },
-      "RecipeIn": {
+      "RecipeOut": {
         "properties": {
-          "recipe_id": {
+          "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Recipe Id"
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/RecipeSourceType"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
+          "yield_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yield Text"
+          },
+          "yield_quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yield Quantity"
+          },
+          "yield_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yield Unit"
+          },
+          "total_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Time Minutes"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          },
+          "is_draft": {
+            "type": "boolean",
+            "title": "Is Draft"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "prep_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prep Time Minutes"
+          },
+          "cook_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cook Time Minutes"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "ingredients": {
+            "items": {
+              "$ref": "#/components/schemas/IngredientLineOut"
+            },
+            "type": "array",
+            "title": "Ingredients",
+            "default": []
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/StepOut"
+            },
+            "type": "array",
+            "title": "Steps",
+            "default": []
           },
           "servings": {
             "anyOf": [
-              {
-                "type": "number"
-              },
               {
                 "type": "string"
               },
@@ -5988,13 +7816,392 @@
               }
             ],
             "title": "Servings"
+          },
+          "scale": {
+            "type": "string",
+            "title": "Scale",
+            "default": "1"
           }
         },
         "type": "object",
         "required": [
-          "recipe_id"
+          "id",
+          "title",
+          "description",
+          "source_type",
+          "source_url",
+          "image_url",
+          "yield_text",
+          "yield_quantity",
+          "yield_unit",
+          "total_time_minutes",
+          "rating",
+          "is_draft",
+          "created_at",
+          "updated_at",
+          "prep_time_minutes",
+          "cook_time_minutes",
+          "notes",
+          "created_by"
         ],
-        "title": "RecipeIn"
+        "title": "RecipeOut"
+      },
+      "RecipePatch": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "yield_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yield Text"
+          },
+          "yield_quantity": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yield Quantity"
+          },
+          "yield_unit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yield Unit"
+          },
+          "prep_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prep Time Minutes"
+          },
+          "cook_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cook Time Minutes"
+          },
+          "total_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Time Minutes"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 5.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          },
+          "is_draft": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Draft"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "ingredients": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IngredientLineIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingredients"
+          },
+          "steps": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/StepIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Steps"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "title": "RecipePatch",
+        "description": "Only the fields sent change. `tags`, `ingredients` and `steps` replace the whole\nlist when sent (send ids back to keep existing lines and steps)."
+      },
+      "RecipeSourceType": {
+        "type": "string",
+        "enum": [
+          "url",
+          "photo",
+          "text",
+          "manual"
+        ],
+        "title": "RecipeSourceType"
+      },
+      "RecipeSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/RecipeSourceType"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
+          "yield_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yield Text"
+          },
+          "yield_quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yield Quantity"
+          },
+          "yield_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yield Unit"
+          },
+          "total_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Time Minutes"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          },
+          "is_draft": {
+            "type": "boolean",
+            "title": "Is Draft"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "description",
+          "source_type",
+          "source_url",
+          "image_url",
+          "yield_text",
+          "yield_quantity",
+          "yield_unit",
+          "total_time_minutes",
+          "rating",
+          "is_draft",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "RecipeSummary"
       },
       "RefreshRequest": {
         "properties": {
@@ -6011,6 +8218,106 @@
         ],
         "title": "RefreshRequest"
       },
+      "ReviewDecision": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "enum": [
+              "ingredient",
+              "step",
+              "section"
+            ],
+            "title": "Target"
+          },
+          "index": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index"
+          },
+          "field": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "title",
+                  "yield",
+                  "times",
+                  "groups"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "accepted",
+              "edited"
+            ],
+            "title": "Action"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "high",
+                  "check",
+                  "low"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "ingredient": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IngredientEdit"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target",
+          "action"
+        ],
+        "title": "ReviewDecision",
+        "description": "One item the user decided. Ingredients and steps by `index` in the import result,\nsections by `field`. Edits carry `ingredient`, `text` (step) or `value` (section)."
+      },
       "RoleUpdate": {
         "properties": {
           "role": {
@@ -6022,6 +8329,204 @@
           "role"
         ],
         "title": "RoleUpdate"
+      },
+      "SourceOut": {
+        "properties": {
+          "meal_plan_entry_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Meal Plan Entry Id"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "meal_slot": {
+            "$ref": "#/components/schemas/MealSlot"
+          },
+          "recipe_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Recipe Id"
+          },
+          "recipe_title": {
+            "type": "string",
+            "title": "Recipe Title"
+          },
+          "servings": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Servings"
+          },
+          "recipe_ingredient_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Recipe Ingredient Id"
+          },
+          "raw_text": {
+            "type": "string",
+            "title": "Raw Text"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "quantity_max": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity Max"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "meal_plan_entry_id",
+          "date",
+          "meal_slot",
+          "recipe_id",
+          "recipe_title",
+          "servings",
+          "recipe_ingredient_id",
+          "raw_text",
+          "quantity",
+          "quantity_max",
+          "unit"
+        ],
+        "title": "SourceOut"
+      },
+      "StepIn": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Text"
+          },
+          "group_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Name"
+          },
+          "timers": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "StepIn"
+      },
+      "StepOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "group_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Name"
+          },
+          "timers": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "position",
+          "text",
+          "group_name",
+          "timers"
+        ],
+        "title": "StepOut"
       },
       "StoreIn": {
         "properties": {
@@ -6685,6 +9190,232 @@
           "columns"
         ],
         "title": "WritableTable"
+      },
+      "thymble__api__recipes__RecipeIn": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "yield_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yield Text"
+          },
+          "yield_quantity": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yield Quantity"
+          },
+          "yield_unit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yield Unit"
+          },
+          "prep_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prep Time Minutes"
+          },
+          "cook_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cook Time Minutes"
+          },
+          "total_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Time Minutes"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 5.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          },
+          "is_draft": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Draft"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "ingredients": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IngredientLineIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingredients"
+          },
+          "steps": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/StepIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Steps"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "RecipeIn"
+      },
+      "thymble__api__shopping_schemas__RecipeIn": {
+        "properties": {
+          "recipe_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Recipe Id"
+          },
+          "servings": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Servings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recipe_id"
+        ],
+        "title": "RecipeIn"
       }
     },
     "securitySchemes": {
