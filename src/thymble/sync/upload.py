@@ -5,8 +5,8 @@ PowerSync clients queue local writes as CRUD entries (`op` PUT / PATCH / DELETE,
 - PUT    insert the row, or update it if the id exists (only the columns sent change);
          a soft-deleted row comes back to life.
 - PATCH  update the columns sent; the row must exist.
-- DELETE soft delete (sets `deleted_at`); deleting a missing or deleted row is a no-op,
-         so retries are safe.
+- DELETE soft delete (sets `deleted_at`, or runs the table's `on_delete`); deleting a
+         missing or deleted row is a no-op, so retries are safe.
 
 The whole batch is one transaction: any invalid entry rejects the batch with a 4xx whose
 detail names the entry, and nothing is written. 4xx means "this batch will never apply"
@@ -208,7 +208,10 @@ def _apply(ctx: WriteContext, op: Op, table: SyncTable, row_id: uuid.UUID, data:
 
     if op == "DELETE":
         if row is not None and row.deleted_at is None:
-            row.deleted_at = now()
+            if table.on_delete is not None:
+                table.on_delete(ctx, row)
+            else:
+                row.deleted_at = now()
         return
 
     if op == "PATCH" and row is None:

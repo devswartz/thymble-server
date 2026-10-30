@@ -15,6 +15,7 @@ Other features register their own tables the same way (see `thymble.sync.registr
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from thymble.models import (
@@ -34,6 +35,7 @@ from thymble.models import (
     Tag,
     Trip,
 )
+from thymble.shopping.service import ShoppingService
 from thymble.sync.registry import Op, SyncTable, WriteContext, WriteRejected, register
 
 
@@ -44,12 +46,23 @@ def _recipe_author(
         row.created_by = ctx.user.id
 
 
-def _item_checker(
+def _shopping(ctx: WriteContext, household_id: uuid.UUID) -> ShoppingService:
+    return ShoppingService(ctx.db, household_id, ctx.user.id)
+
+
+def _item_rules(
     ctx: WriteContext, row: ShoppingItem, op: Op, inserting: bool, changes: dict[str, Any]
 ) -> None:
     # Whoever uploads the check-off is who checked it; clients can't name someone else.
     if "checked_at" in changes:
         row.checked_by = ctx.user.id if row.checked_at is not None else None
+    # Urgency (and its stop-gap), re-assignment and check-offs: the REST rules.
+    _shopping(ctx, row.household_id).apply_client_change(row, changes)
+
+
+def _item_delete(ctx: WriteContext, row: ShoppingItem) -> None:
+    # A deleted bulk item takes its stop-gaps with it, as on REST.
+    _shopping(ctx, row.household_id).delete_item(row)
 
 
 def _trip_shopper(
@@ -78,12 +91,15 @@ register(SyncTable(MealPlanEntry))
 
 # Shopping. Order export/confirmation (trip_id, status on_order) and stop-gap links
 # (bridge_of) go through the REST endpoints, which apply the rules in thymble.shopping.
+# Urgency, store assignment, check-offs and deletes sync, and run through the same
+# ShoppingService methods as REST: a stop-gap appears or goes away the same either way.
 register(SyncTable(ShoppingList))
 register(
     SyncTable(
         ShoppingItem,
         readonly=frozenset({"checked_by", "trip_id", "bridge_of"}),
-        before_write=_item_checker,
+        before_write=_item_rules,
+        on_delete=_item_delete,
     )
 )
 register(

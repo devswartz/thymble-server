@@ -652,6 +652,12 @@ class ShoppingService:
         item.status = ItemStatus.BOUGHT
         item.checked_at = utcnow()
         item.checked_by = self.user_id
+        self._after_bought(item, store_id=store_id, trip_id=trip_id)
+        return item
+
+    def _after_bought(
+        self, item: ShoppingItem, *, store_id: uuid.UUID | None, trip_id: uuid.UUID | None
+    ) -> None:
         item.urgency = Urgency.NORMAL
         if trip_id is not None:
             item.trip_id = trip_id
@@ -666,17 +672,39 @@ class ShoppingService:
                 self.mark_bought(gap, trip_id=trip_id)
             if store_id is not None and item.ingredient_id is not None:
                 self._learn_checkoff(item, store_id, trip_id)
-        return item
 
     def mark_needed(self, item: ShoppingItem) -> ShoppingItem:
         if item.status == ItemStatus.NEEDED:
             return item
         item.status = ItemStatus.NEEDED
+        self._after_needed(item)
+        return item
+
+    def _after_needed(self, item: ShoppingItem) -> None:
         item.checked_at = None
         item.checked_by = None
         item.trip_id = None
         self._touch(item)
-        return item
+
+    def apply_client_change(self, item: ShoppingItem, changed: Iterable[str]) -> None:
+        """Apply the list rules to columns a device has already written (PowerSync upload).
+
+        REST calls `set_urgent`, `assign`, `mark_bought` and `mark_needed` directly; a
+        synced write lands here and runs the same code, so urgency (with its stop-gap),
+        re-assignment and check-offs behave the same whichever way they arrive.
+        """
+        changed = set(changed)
+        if "status" in changed and item.status == ItemStatus.BOUGHT:
+            if item.checked_at is None:
+                item.checked_at = utcnow()
+                item.checked_by = self.user_id
+            self._after_bought(item, store_id=None, trip_id=None)
+            return
+        if "status" in changed and item.status == ItemStatus.NEEDED:
+            self._after_needed(item)
+        assignment_changed = bool(changed & {"store_id", "store_group_id"})
+        if "urgency" in changed or (assignment_changed and item.urgency == Urgency.URGENT):
+            self.set_urgent(item, item.urgency == Urgency.URGENT)
 
     def delete_item(self, item: ShoppingItem) -> None:
         if item.deleted_at is not None:
