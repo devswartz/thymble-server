@@ -35,6 +35,7 @@ from thymble.models import (
     Tag,
     Trip,
 )
+from thymble.shopping import mealplan
 from thymble.shopping.service import ShoppingService
 from thymble.sync.registry import Op, SyncTable, WriteContext, WriteRejected, register
 
@@ -58,6 +59,10 @@ def _item_rules(
         row.checked_by = ctx.user.id if row.checked_at is not None else None
     # Urgency (and its stop-gap), re-assignment and check-offs: the REST rules.
     _shopping(ctx, row.household_id).apply_client_change(row, changes)
+
+
+def _plan_entry_delete(ctx: WriteContext, row: MealPlanEntry) -> None:
+    mealplan.delete_entry(_shopping(ctx, row.household_id), row)
 
 
 def _item_delete(ctx: WriteContext, row: ShoppingItem) -> None:
@@ -87,7 +92,8 @@ register(SyncTable(RecipeIngredient))
 register(SyncTable(RecipeStep))
 register(SyncTable(Tag))
 register(SyncTable(RecipeTag))
-register(SyncTable(MealPlanEntry))
+# Removing a plan entry takes its share off the shopping lists, as DELETE /v1/meal-plan does.
+register(SyncTable(MealPlanEntry, on_delete=_plan_entry_delete))
 
 # Shopping. Order export/confirmation (trip_id, status on_order) and stop-gap links
 # (bridge_of) go through the REST endpoints, which apply the rules in thymble.shopping.
