@@ -9,13 +9,16 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select, update
 
 from tests.auth.conftest import PUBLIC_URL, auth_settings, build_client
-from thymble.api.auth import EMAIL_REQUESTS_PER_ADDRESS, EMAIL_REQUESTS_PER_CLIENT
 from thymble.auth.email import get_email_sender, magic_link
 from thymble.auth.tokens import now
 from thymble.main import create_app
 from thymble.models import EmailLoginToken
 
 pytestmark = pytest.mark.db
+
+# The defaults: RATE_LIMIT_MAGIC_LINK_PER_EMAIL=5/hour, RATE_LIMIT_MAGIC_LINK_PER_IP=20/hour
+EMAIL_REQUESTS_PER_ADDRESS = 5
+EMAIL_REQUESTS_PER_CLIENT = 20
 
 
 def request_link(api: TestClient, email: str):

@@ -35,6 +35,7 @@ from thymble.config import Settings, normalize_db_url
 from thymble.db.deps import get_db
 from thymble.main import create_app
 from thymble.models import Base
+from thymble.ratelimit import MemoryRateLimiter, get_rate_limiter
 
 ROOT = Path(__file__).resolve().parents[2]
 BUNDLE_ID = "com.example.thymble"
@@ -175,6 +176,9 @@ def build_client(
     app.dependency_overrides[get_db] = _db
     app.dependency_overrides[get_apple_verifier] = fake_apple.verifier
     app.dependency_overrides[get_email_sender] = lambda: outbox
+    # Rate-limit counters in memory, fresh for every client (no Redis in tests).
+    limiter = MemoryRateLimiter()
+    app.dependency_overrides[get_rate_limiter] = lambda: limiter
     return TestClient(app)
 
 

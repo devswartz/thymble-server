@@ -10,7 +10,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -19,6 +19,7 @@ from thymble.auth.accounts import active_memberships, create_household
 from thymble.auth.deps import AppSettings, CurrentUser, DbSession, require_member
 from thymble.auth.tokens import hash_secret, now
 from thymble.models import Household, HouseholdInvite, HouseholdMember, HouseholdRole, User
+from thymble.ratelimit import Hit, Limiter, client_ip, enforce, parse_limit
 
 router = APIRouter(prefix="/households", tags=["households"])
 
@@ -252,8 +253,35 @@ def revoke_invite(
 
 
 @router.post("/join")
-def join(body: JoinRequest, user: CurrentUser, db: DbSession) -> HouseholdOut:
-    """Redeem an invite code. Each code works once."""
+def join(
+    body: JoinRequest,
+    request: Request,
+    user: CurrentUser,
+    db: DbSession,
+    settings: AppSettings,
+    limiter: Limiter,
+) -> HouseholdOut:
+    """Redeem an invite code. Each code works once.
+
+    Rate-limited per user (RATE_LIMIT_INVITE_JOIN_PER_USER) and per client address
+    (RATE_LIMIT_INVITE_JOIN_PER_IP) so codes can't be guessed by brute force.
+    """
+    enforce(
+        limiter,
+        [
+            Hit(
+                "invite_join_user",
+                parse_limit(settings.rate_limit_invite_join_per_user),
+                str(user.id),
+            ),
+            Hit(
+                "invite_join_ip",
+                parse_limit(settings.rate_limit_invite_join_per_ip),
+                client_ip(request, settings),
+            ),
+        ],
+        "too many join attempts; try again later",
+    )
     current = now()
     invite = db.scalars(
         select(HouseholdInvite)

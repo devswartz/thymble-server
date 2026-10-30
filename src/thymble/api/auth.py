@@ -8,7 +8,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select, update
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from thymble.auth import tokens
@@ -30,13 +30,9 @@ from thymble.auth.email import (
 )
 from thymble.config import Settings
 from thymble.models import EmailLoginToken, Household, HouseholdRole, User
+from thymble.ratelimit import Hit, Limiter, client_ip, enforce, parse_limit
 
 router = APIRouter(tags=["auth"])
-
-# Magic-link request limits per rolling hour. The per-address limit applies whether or
-# not an account exists, so hitting it reveals nothing about accounts.
-EMAIL_REQUESTS_PER_ADDRESS = 5
-EMAIL_REQUESTS_PER_CLIENT = 20
 
 
 class TokenResponse(BaseModel):
@@ -104,11 +100,6 @@ class EmailSignInVerify(BaseModel):
     token: str = Field(min_length=20, max_length=256)
 
 
-def _client_fingerprint(request: Request) -> str | None:
-    host = request.client.host if request.client else None
-    return tokens.hash_secret(host) if host else None
-
-
 @router.post("/auth/email/request", status_code=status.HTTP_202_ACCEPTED)
 def request_email_sign_in(
     body: EmailSignInRequest,
@@ -117,8 +108,14 @@ def request_email_sign_in(
     db: DbSession,
     settings: AppSettings,
     sender: Annotated[EmailSender | None, Depends(get_email_sender)],
+    limiter: Limiter,
 ) -> EmailSignInAccepted:
-    """Email a sign-in link. Same answer whether or not an account exists."""
+    """Email a sign-in link. Same answer whether or not an account exists.
+
+    Rate-limited per address (RATE_LIMIT_MAGIC_LINK_PER_EMAIL, counted whether or not an
+    account exists, so hitting it reveals nothing) and per client address
+    (RATE_LIMIT_MAGIC_LINK_PER_IP).
+    """
     if sender is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "email sign-in is off")
     try:
@@ -126,29 +123,23 @@ def request_email_sign_in(
     except ValueError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
-    current = tokens.now()
-    window_start = current - timedelta(hours=1)
-    fingerprint = _client_fingerprint(request)
-    recent = select(func.count()).where(EmailLoginToken.created_at > window_start)
-    per_address = db.scalar(recent.where(EmailLoginToken.email == email)) or 0
-    per_client = (
-        db.scalar(recent.where(EmailLoginToken.requester_hash == fingerprint)) or 0
-        if fingerprint
-        else 0
+    ip = client_ip(request, settings)
+    enforce(
+        limiter,
+        [
+            Hit("magic_link_email", parse_limit(settings.rate_limit_magic_link_per_email), email),
+            Hit("magic_link_ip", parse_limit(settings.rate_limit_magic_link_per_ip), ip),
+        ],
+        "too many sign-in requests; try again later",
     )
-    if per_address >= EMAIL_REQUESTS_PER_ADDRESS or per_client >= EMAIL_REQUESTS_PER_CLIENT:
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS,
-            "too many sign-in requests; try again later",
-            headers={"Retry-After": "3600"},
-        )
 
+    current = tokens.now()
     token = tokens.new_secret()
     db.add(
         EmailLoginToken(
             email=email,
             token_hash=tokens.hash_secret(token),
-            requester_hash=fingerprint,
+            requester_hash=tokens.hash_secret(ip) if ip else None,
             created_at=current,
             expires_at=current + timedelta(minutes=settings.magic_link_ttl_minutes),
         )
