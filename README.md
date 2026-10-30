@@ -59,8 +59,14 @@ If a host port is already taken, set `THYMBLE_API_PORT`, `POWERSYNC_PORT`, `POST
 | `deploy/postgres/` | First-boot SQL for PowerSync: replication role, publication, storage database |
 | `deploy/powersync/` | PowerSync service config and sync config (what each device downloads, scoped by household) |
 | `scripts/dev_env.py` | Writes a development `.env` from `.env.example` |
+| `scripts/export_openapi.py` | Regenerates `docs/openapi.json`, the published OpenAPI document (`--check` fails if it is stale) |
+| `docs/` | `openapi.json`, [self-hosting guide](docs/self-hosting.md), [OAuth account-linking design](docs/oauth-account-linking.md) |
 | `tests/` | pytest suite; database tests need `DATABASE_URL` and create a throwaway database. `tests/accounts.py` creates a signed-in member for API tests |
 | `tests/vectors/` | Shared ingredient-line test vectors, also run by the iOS app's Swift package (D-033); format in its README |
+
+### OpenAPI
+
+`docs/openapi.json` is the api's OpenAPI document, committed so clients (the iOS app, connector authors) can read it without running the server. After changing a route or a request/response model, regenerate it with `uv run python scripts/export_openapi.py` (or `docker compose exec api python scripts/export_openapi.py`) and commit it; `tests/test_openapi.py` fails while it is stale. A running server also serves it at `/openapi.json`, with interactive docs at `/docs`.
 
 ### Dependencies
 
