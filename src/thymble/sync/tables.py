@@ -1,7 +1,7 @@
 """Tables devices can write through the PowerSync upload endpoint.
 
 Recipes (with lines, steps, tags). An imported draft whose review state is needs_review is
-finalized through `POST /v1/recipes/{id}/review` (D-034), which checks that every "low" item
+finalized through `POST /v1/imports/{id}/finalize` (D-034), which checks that every "low" item
 was confirmed or edited; other drafts are finalized by clearing `is_draft`. Import confidence
 (`review_state`, `confidence`, `review`) is server-owned and read-only here.
 the meal plan, the shopping list with item provenance, trips, stores, store groups and
@@ -56,7 +56,7 @@ def _recipe_author(
         and row.review_state == ReviewState.NEEDS_REVIEW
         and row.deleted_at is None
     ):
-        raise WriteRejected("finish the import review with POST /v1/recipes/{id}/review")
+        raise WriteRejected("finish the import review with POST /v1/imports/{id}/finalize")
 
 
 def _shopping(ctx: WriteContext, household_id: uuid.UUID) -> ShoppingService:

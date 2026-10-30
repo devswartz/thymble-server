@@ -33,7 +33,7 @@ class RecipeSourceType(enum.StrEnum):
 
 class ReviewState(enum.StrEnum):
     """Import review (D-034): an import with anything not "high" (and every photo import)
-    starts in needs_review; POST /v1/recipes/{id}/review moves it to reviewed."""
+    starts in needs_review; POST /v1/imports/{id}/finalize moves it to reviewed."""
 
     NEEDS_REVIEW = "needs_review"
     REVIEWED = "reviewed"
