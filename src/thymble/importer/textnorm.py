@@ -95,9 +95,8 @@ _TOKEN = re.compile(
 
 
 def _unit_of(token: str) -> str | None:
-    bare = token.rstrip(".")
-    if bare.lower() not in rules.UNIT_ALIASES and bare not in ("T", "t"):
-        return None
+    if token.rstrip(".") == "t":
+        return "tsp"
     unit = rules.norm_unit(token)
     return unit if unit in _CANONICAL_UNITS else None
 
