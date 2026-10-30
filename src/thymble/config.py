@@ -91,6 +91,10 @@ class Settings(BaseSettings):
     magic_link_url: str = ""
     magic_link_ttl_minutes: int = 15
     household_invite_ttl_hours: int = 168
+    # Refresh-token reuse grace: a refresh token presented again within this many seconds
+    # of its rotation (two devices or a retried request racing) gets the same new pair
+    # instead of tripping theft detection. 0 turns the grace off.
+    refresh_reuse_grace_seconds: int = Field(default=30, ge=0, le=300)
 
     # Rate limits (thymble.ratelimit): "N/period" such as "5/hour" or "20/10min";
     # "0" turns one rule off. Counters live in Redis (REDIS_URL) unless storage is
